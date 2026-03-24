@@ -27,7 +27,8 @@ import {
   Shirt,
   Coffee,
   X,
-  AlertCircle
+  AlertCircle,
+  Video
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -217,6 +218,12 @@ export default function App() {
   const [dayPrompt, setDayPrompt] = useState('');
   const [importJson, setImportJson] = useState('');
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
+  const [importStartDate, setImportStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [postsPerDay, setPostsPerDay] = useState(1);
+  const [avoidDuplicates, setAvoidDuplicates] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [videoStatus, setVideoStatus] = useState<Record<string, 'idle'|'submitted'|'processing'|'done'|'failed'>>({});
+  const [previewSlideIndex, setPreviewSlideIndex] = useState<Record<string, number>>({});
   const [isAIGeneratingDay, setIsAIGeneratingDay] = useState(false);
   const [showGenerationChoice, setShowGenerationChoice] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -224,7 +231,11 @@ export default function App() {
   const [publicTunnelUrl, setPublicTunnelUrl] = useState<string>(localStorage.getItem('public_tunnel_url') || '');
   const [klingApiKey, setKlingApiKey] = useState<string>(localStorage.getItem('kling_api_key') || '');
   const [klingApiSecret, setKlingApiSecret] = useState<string>(localStorage.getItem('kling_api_secret') || '');
-  const [klingVariant, setKlingVariant] = useState<'kling-v2-5-Turbo' | 'kling-v2-6'>(localStorage.getItem('kling_variant') as any || 'kling-v2-5-Turbo');
+  const [klingVariant, setKlingVariant] = useState<'kling-v1' | 'kling-v1-pro'>(
+    (localStorage.getItem('kling_variant') && localStorage.getItem('kling_variant') !== 'kling-v2-5-Turbo') 
+    ? localStorage.getItem('kling_variant') as any 
+    : 'kling-v1'
+  );
   const [nanobananaApiKey, setNanobananaApiKey] = useState<string>(localStorage.getItem('nanobanana_api_key') || '');
   const [activeImageModel, setActiveImageModel] = useState<'gemini' | 'nanobanana'>(localStorage.getItem('active_image_model') as any || 'gemini');
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -319,11 +330,24 @@ export default function App() {
 
         
         const dayNum = parseInt(getValue(0).toString());
+        const rowTheme = getValue(4).toString();
         
+        // Check Duplicate
+        const isDuplicate = days.some(d => 
+            d.personaId === selectedPersonaId && 
+            (d.theme === rowTheme || d.dayNumber === dayNum)
+        );
+        if (avoidDuplicates && isDuplicate) return; 
+
+        const dayOffset = Math.floor(index / postsPerDay);
+        const calcDate = new Date(importStartDate);
+        calcDate.setDate(calcDate.getDate() + dayOffset);
+        const formattedDate = calcDate.toISOString().split('T')[0];
+
         newDays.push({
           id: generateUUID(),
           dayNumber: isNaN(dayNum) ? (index + 1) : dayNum,
-          date: getValue(1).toString() || '',
+          date: formattedDate,
           platforms: [getValue(2).toString() || 'Instagram'],
           contentType: getValue(3).toString() || 'Photo',
           theme: getValue(4).toString() || '',
@@ -342,6 +366,19 @@ export default function App() {
       });
 
       if (newDays.length > 0) {
+        try {
+            // Save each day to backend database
+            for (const day of newDays) {
+                await fetch('/api/days', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(day)
+                });
+            }
+        } catch (e) {
+            console.error("Failed to save imported days to DB:", e);
+        }
+
         setDays(prev => [...prev, ...newDays]);
 
         setSelectedDayId(newDays[0].id);
@@ -454,6 +491,7 @@ export default function App() {
       }
     }
 
+    fetch('/api/days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newDay) });
     setDays([...days, newDay]);
     setSelectedDayId(newDay.id);
   };
@@ -461,6 +499,7 @@ export default function App() {
 
   const deleteDay = (id: string) => {
     if (days.length === 1) return;
+    fetch(`/api/days/${id}`, { method: 'DELETE' });
     const newDays = days.filter(d => d.id !== id);
     setDays(newDays);
     if (selectedDayId === id) {
@@ -646,7 +685,7 @@ export default function App() {
       const response = await ai.models.generateContent({
         model: GENERATION_MODEL,
         contents: { parts },
-        config: { imageConfig: { aspectRatio: "4:5", imageSize: "1K" } }
+        config: { imageConfig: { aspectRatio: "9:16", imageSize: "1K" } }
       });
 
       for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -762,7 +801,8 @@ export default function App() {
                     image_url: publicImageUrl,
                     apiKey: klingApiKey,
                     apiSecret: klingApiSecret,
-                    model_name: klingVariant
+                    model_name: klingVariant,
+                    publicTunnelUrl: publicTunnelUrl
                  })
               });
               const respText = await resp.text();
@@ -795,6 +835,102 @@ export default function App() {
     } finally {
       setIsGenerating(false);
       setShowGenerationChoice(false);
+    }
+  };
+
+  const generateVideoOnly = async (dayId: string) => {
+    const day = days.find(d => d.id === dayId);
+    if (!day || !day.generatedImageUrl) return alert("Image must be generated first!");
+    
+    setVideoStatus(s => ({ ...s, [dayId]: 'submitted' }));
+    setIsGenerating(true);
+    try {
+        const base = publicTunnelUrl || window.location.origin;
+        const publicImageUrl = day.generatedImageUrl.startsWith('http') ? day.generatedImageUrl : `${base.endsWith('/') ? base.slice(0, -1) : base}${day.generatedImageUrl}`; 
+        const randomAngle = VIDEO_HOOK_ANGLES[Math.floor(Math.random() * VIDEO_HOOK_ANGLES.length)];
+        
+        console.log("[App] Requesting Kling Video Only via Proxy for angle:", randomAngle);
+        
+        const resp = await fetch('/api/videos/generate', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({
+              prompt: `Animate this scene naturally for 5 seconds. Camera Frame Angle: ${randomAngle}. Scene: ${day.sceneDescription}`,
+              image_url: publicImageUrl,
+              apiKey: klingApiKey,
+              apiSecret: klingApiSecret,
+              model_name: klingVariant,
+              publicTunnelUrl: publicTunnelUrl
+           })
+        });
+        const respText = await resp.text();
+        console.log("[Kling Proxy Only Raw]:", respText);
+        
+        try {
+            const vData = JSON.parse(respText);
+            if (vData.taskId) {
+                console.log("[App] Task ID Submitted successfully:", vData.taskId);
+                
+                let attempts = 0;
+                const maxAttempts = 100;
+                while (attempts < maxAttempts) {
+                    await new Promise(r => setTimeout(r, 10000)); // wait 10s
+                    attempts++;
+                    
+                    console.log(`[App] Polling Task ${vData.taskId} ... Attempt ${attempts}/${maxAttempts}`);
+                    
+                    const statusResp = await fetch(`/api/videos/status/${vData.taskId}`, {
+                         headers: { 
+                             'x-api-key': klingApiKey, 
+                             'x-api-secret': klingApiSecret 
+                         }
+                    });
+                    const statusData = await statusResp.json();
+                    console.log("[App] Polling status reply:", JSON.stringify(statusData));
+                    const status = statusData.task_status;
+                    const videoUrl = statusData.video_url;
+
+                     if (status === 'processing') {
+                         setVideoStatus(s => ({ ...s, [dayId]: 'processing' }));
+                     }
+                    if (status === 'succeed') {
+                         console.log("[App] Success! Saving video to local downloads folder...");
+                         if (!videoUrl) throw new Error("Video success but no URL returned from Kling.");
+
+                         const saveResp = await fetch('/api/videos/save', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({ videoUrl })
+                         });
+                         const saveResult = await saveResp.json();
+                         if (saveResult.url) {
+                         setVideoStatus(s => ({ ...s, [dayId]: 'done' }));
+                         updateDay(dayId, { generatedVideoUrl: saveResult.url });
+                             alert("Video Generated & Saved successfully!");
+                             return;
+                         } else {
+                             throw new Error("Failed to save final file locally.");
+                         }
+                    } else if (status === 'failed') {
+                         setVideoStatus(s => ({ ...s, [dayId]: 'failed' }));
+                         throw new Error(`Kling Task Failed. Check Kling dashboard.`);
+                    }
+                    // status is 'submitted' or 'processing' - keep polling
+                }
+                throw new Error("Task timed out after 16 minutes. The video may still be processing in Kling dashboard.");
+            } else if (vData.error) {
+                throw new Error(vData.error);
+            } else {
+                throw new Error(`Kling starting failed: ${respText.slice(0,200)}`);
+            }
+        } catch (parseErr: any) {
+            throw new Error(`Kling Proxy Failed: ${parseErr.message || respText.slice(0, 500)}`);
+        }
+    } catch (e: any) {
+        console.error("Kling Video Only Failed:", e);
+        alert(`Kling Video Generation Failed: ${e.message}`);
+    } finally {
+        setIsGenerating(false);
     }
   };
 
@@ -1250,6 +1386,40 @@ export default function App() {
                   value={importJson}
                   onChange={e => setImportJson(e.target.value)}
                 />
+
+                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-zinc-100">
+                   <div>
+                     <label className="block text-[10px] font-bold text-zinc-500 mb-1">STARTING DATE (Assign calendars from)</label>
+                     <input 
+                       type="date"
+                       value={importStartDate}
+                       onChange={e => setImportStartDate(e.target.value)}
+                       className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-medium cursor-pointer"
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-[10px] font-bold text-zinc-500 mb-1">POSTS PER DAY FREQUENCY</label>
+                     <input 
+                       type="number"
+                       min={1}
+                       max={10}
+                       value={postsPerDay}
+                       onChange={e => setPostsPerDay(parseInt(e.target.value) || 1)}
+                       className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-medium"
+                     />
+                   </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-3">
+                   <input 
+                     type="checkbox"
+                     id="avoidDup"
+                     checked={avoidDuplicates}
+                     onChange={e => setAvoidDuplicates(e.target.checked)}
+                     className="rounded border-zinc-300 text-black focus:ring-black cursor-pointer"
+                   />
+                   <label htmlFor="avoidDup" className="text-xs font-bold text-zinc-600 cursor-pointer">Avoid Importing Duplicates (By Day # or Theme)</label>
+                </div>
               </div>
               <div className="p-6 bg-zinc-50 flex justify-end gap-3">
                 <button 
@@ -1457,28 +1627,47 @@ export default function App() {
             </button>
           </div>
           
-          <div className="space-y-2">
-            <button 
-              onClick={addNewDay}
-              className="w-full flex items-center justify-center gap-2 bg-black text-white py-2.5 rounded-xl font-medium hover:bg-zinc-800 transition-colors shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              New Day
-            </button>
-            <div className="flex gap-2">
+          <div className="space-y-1.5">
+            {/* Row 1: New Day & AI Prompt */}
+            <div className="flex gap-1.5">
               <button 
-                onClick={() => setIsPromptModalOpen(true)}
-                className="flex-1 flex items-center justify-center gap-2 bg-zinc-100 text-zinc-600 py-2.5 rounded-xl font-medium hover:bg-zinc-200 transition-colors"
+                onClick={addNewDay}
+                className="flex-1 flex items-center justify-center gap-1 bg-black text-white py-2 rounded-xl text-[11px] font-bold hover:bg-zinc-800 transition-colors shadow-sm"
               >
-                <Sparkles className="w-4 h-4" />
-                AI Prompt
+                <Plus className="w-3.5 h-3.5" />
+                New Day
               </button>
               <button 
+                onClick={() => setIsPromptModalOpen(true)}
+                className="flex-1 flex items-center justify-center gap-1 bg-zinc-100 text-zinc-600 py-2 rounded-xl text-[11px] font-bold hover:bg-zinc-100/80 border border-zinc-200 hover:border-zinc-300 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                AI Prompt
+              </button>
+            </div>
+
+            {/* Row 2: Import & Calendar Toggle */}
+            <div className="flex gap-1.5">
+              <button 
                 onClick={() => setIsImportModalOpen(true)}
-                className="p-2.5 bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 bg-zinc-100 text-zinc-600 py-2 rounded-xl text-[11px] font-bold hover:bg-zinc-100/80 border border-zinc-200 hover:border-zinc-300 transition-colors"
                 title="Import from Sheets/JSON"
               >
-                <FileJson className="w-5 h-5" />
+                <FileJson className="w-3.5 h-3.5" />
+                Import
+              </button>
+              <button 
+                onClick={() => setViewMode(viewMode === 'list' ? 'calendar' : 'list')}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-bold transition-all border",
+                  viewMode === 'calendar' 
+                    ? "bg-amber-50 border-amber-200 text-amber-700 shadow-sm" 
+                    : "bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-100/80"
+                )}
+                title="Toggle Calendar Grid View"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                {viewMode === 'calendar' ? "Dashboard" : "Calendar"}
               </button>
             </div>
           </div>
@@ -1628,8 +1817,8 @@ export default function App() {
                                onChange={(e) => setKlingVariant(e.target.value as any)}
                                className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-medium cursor-pointer shadow-sm"
                              >
-                               <option value="kling-v2-5-Turbo">Kling v2.5 Turbo (Cost Optimized)</option>
-                               <option value="kling-v2-6">Kling v2.6 (High Quality)</option>
+                               <option value="kling-v1">Kling v1 (Standard)</option>
+                               <option value="kling-v1-pro">Kling v1 Pro (High Quality)</option>
                              </select>
                            </div>
                         </div>
@@ -1677,7 +1866,77 @@ export default function App() {
         ) : (
         <div className="max-w-6xl mx-auto p-8">
 
-          {selectedDay ? (
+          {viewMode === 'calendar' ? (
+             <div className="bg-white rounded-3xl p-6 border border-zinc-100 shadow-xl max-h-[85vh] overflow-y-auto">
+                 <h2 className="text-xl font-bold mb-4 tracking-tight flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-zinc-600" />
+                    Content Schedule Month View
+                 </h2>
+                 <p className="text-xs text-zinc-400 mb-6 font-medium">Click on any Scheduled meeting post card node to instantly load its dashboard configurations setup list flawlessly index Node triggers flawless!</p>
+
+                 {(() => {
+                    const uniqueDates = [...new Set(personaDays.map(d => d.date))].sort();
+                    if (uniqueDates.length === 0) return <div className="p-8 text-center text-zinc-400 text-xs">No posts scheduled yet! Import or Add days to get started.</div>;
+
+                    return (
+                      <div className="space-y-4">
+                         {uniqueDates.map((dateStr: any) => {
+                             const dayItems = personaDays.filter(d => d.date === dateStr);
+                             return (
+                                <div 
+                                   key={dateStr} 
+                                   className="p-4 bg-zinc-50/70 border border-zinc-100 rounded-2xl transition-colors hover:bg-zinc-100/30"
+                                   onDragOver={(e) => e.preventDefault()}
+                                   onDrop={(e) => {
+                                       const dayId = e.dataTransfer.getData('text/plain');
+                                       if (dayId) updateDay(dayId, { date: dateStr });
+                                   }}
+                                >
+                                    <div className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase mb-2">
+                                        {new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {dayItems.map(dp => (
+                                            <button 
+                                                key={dp.id} 
+                                                onClick={() => { setSelectedDayId(dp.id); setViewMode('list'); }}
+                                                draggable
+                                                onDragStart={(e) => {
+                                                    e.dataTransfer.setData('text/plain', dp.id);
+                                                }}
+                                                className={cn(
+                                                    "p-3 rounded-xl border text-left flex flex-col justify-between h-24 bg-white shadow-sm hover:shadow-md hover:border-zinc-300 transition-all cursor-pointer",
+                                                    selectedDayId === dp.id ? "border-black ring-1 ring-black" : "border-zinc-200"
+                                                )}
+                                            >
+                                                 <div className="flex gap-1.5 items-start">
+                                                      {dp.generatedImageUrl && (
+                                                          <img 
+                                                              src={dp.generatedImageUrl} 
+                                                              className="w-7 h-7 rounded-md object-cover flex-shrink-0 border border-zinc-100 shadow-sm"
+                                                              referrerPolicy="no-referrer"
+                                                          />
+                                                      )}
+                                                      <div className="text-xs font-bold text-zinc-800 line-clamp-2 leading-snug">{dp.theme}</div>
+                                                 </div>
+                                                <div className="flex items-center justify-between mt-1">
+                                                    <span className="text-[7.5px] font-bold uppercase text-zinc-400 bg-zinc-100 px-1 py-0.5 rounded">{dp.contentType}</span>
+                                                    <div className="flex gap-1 items-center">
+                                                        {dp.status === 'completed' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-sm" title="Completed" />}
+                                                        {dp.isGoodToPost && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-sm" title="Scheduled" />}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                             )
+                         })}
+                      </div>
+                    );
+                 })()}
+             </div>
+          ) : selectedDay ? (
             <>
               <div className="flex justify-between items-start mb-8">
                 <div>
@@ -2037,25 +2296,85 @@ export default function App() {
                             ))}
                           </div>
                         ) : selectedDay.generatedImageUrl ? (
-                          <div className="relative w-full h-full group">
-                            <img 
-                              src={selectedDay.generatedImageUrl} 
-                              alt="Generated" 
-                              onClick={() => setLightboxImage(selectedDay.generatedImageUrl!)}
-                              className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                              referrerPolicy="no-referrer"
-                            />
-                            {/* Overlay Standard Text (Pure CSS, does not alter original file) */}
-                            <div className="absolute inset-x-4 bottom-12 flex justify-center pointer-events-none">
-                              <p className="bg-black/40 backdrop-blur-md text-white text-center text-xs font-bold px-3 py-2 rounded-xl max-w-[75%] shadow-md">
-                                {selectedDay.onScreenText || selectedDay.theme}
-                              </p>
-                            </div>
+                          (() => {
+                            const slides: { type: 'image' | 'video', url: string }[] = [];
+                            if (selectedDay.generatedImageUrl) slides.push({ type: 'image', url: selectedDay.generatedImageUrl });
+                            if (selectedDay.generatedVideoUrl) slides.push({ type: 'video', url: selectedDay.generatedVideoUrl });
+                            const curIdx = previewSlideIndex[selectedDay.id] || 0;
+                            const cur = slides[curIdx];
+                            const vStatus = videoStatus[selectedDay.id];
+
+                            return (
+                              <div className="relative w-full h-full group">
+                                {/* Main preview */}
+                                {cur.type === 'image' ? (
+                                  <img 
+                                    src={cur.url}
+                                    alt="Generated"
+                                    onClick={() => setLightboxImage(cur.url)}
+                                    className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <video
+                                    src={cur.url}
+                                    className="w-full h-full object-cover"
+                                    controls
+                                    autoPlay
+                                    loop
+                                    muted
+                                  />
+                                )}
+
+                                {/* Text overlay (image only) */}
+                                {cur.type === 'image' && (
+                                  <div className="absolute inset-x-4 bottom-12 flex justify-center pointer-events-none">
+                                    <p className="bg-black/40 backdrop-blur-md text-white text-center text-xs font-bold px-3 py-2 rounded-xl max-w-[75%] shadow-md">
+                                      {selectedDay.onScreenText || selectedDay.theme}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Video processing badge */}
+                                {(vStatus === 'submitted' || vStatus === 'processing') && (
+                                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-2 shadow-lg">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    {vStatus === 'submitted' ? 'Video submitted to Kling...' : 'Video rendering (5–7 min)...'}
+                                  </div>
+                                )}
+
+                                {/* Dot navigation */}
+                                {slides.length > 1 && (
+                                  <>
+                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 pointer-events-none">
+                                      {slides.map((_, i) => (
+                                        <div key={i} className={cn('w-1.5 h-1.5 rounded-full transition-all', i === curIdx ? 'bg-white scale-125' : 'bg-white/50')} />
+                                      ))}
+                                    </div>
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); setPreviewSlideIndex(s => ({ ...s, [selectedDay.id]: Math.max(0, curIdx - 1) })); }}
+                                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+                                    >‹</button>
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); setPreviewSlideIndex(s => ({ ...s, [selectedDay.id]: Math.min(slides.length - 1, curIdx + 1) })); }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+                                    >›</button>
+                                  </>
+                                )}
 
 
                             <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                              {selectedDay.contentType === 'Video' && selectedDay.generatedImageUrl && !selectedDay.generatedVideoUrl && (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); generateVideoOnly(selectedDay.id); }}
+                                  className="p-2 rounded-full shadow-lg backdrop-blur-md bg-white/80 text-zinc-700 hover:bg-black hover:text-white transition-all"
+                                  title="Generate Video from this Image"
+                                >
+                                  <Video className="w-5 h-5 flex-shrink-0" />
+                                </button>
+                              )}
                               <button 
-                                onClick={() => updateDay(selectedDay.id, { isGoodToPost: !selectedDay.isGoodToPost })}
+                                onClick={(e) => { e.stopPropagation(); updateDay(selectedDay.id, { isGoodToPost: !selectedDay.isGoodToPost }); }}
                                 className={cn(
                                   "p-2 rounded-full shadow-lg backdrop-blur-md transition-all",
                                   selectedDay.isGoodToPost ? "bg-green-500 text-white" : "bg-white/80 text-zinc-700 hover:bg-white"
@@ -2063,7 +2382,6 @@ export default function App() {
                               >
                                 <CheckCircle2 className="w-5 h-5" />
                               </button>
-                              
                               <button 
                                 onClick={async () => {
                                    if (!n8nWebhookUrl) return alert("Configure N8N Webhook in Settings!");
@@ -2073,6 +2391,7 @@ export default function App() {
                                          headers: { 'Content-Type': 'application/json' },
                                          body: JSON.stringify({
                                             image: selectedDay.generatedImageUrl,
+                                            video: selectedDay.generatedVideoUrl,
                                             caption: selectedDay.caption,
                                             hashtags: selectedDay.hashtags,
                                             contentType: selectedDay.contentType
@@ -2092,9 +2411,10 @@ export default function App() {
                                 <CheckCircle2 className="w-3.5 h-3.5" /> Approved / Good to Post
                               </div>
                             )}
-                          </div>
+                              </div>
+                            );
+                          })()
                         ) : (
-
                           <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-400 p-12 text-center">
                             {isGenerating ? (
                               <div className="flex flex-col items-center gap-4">

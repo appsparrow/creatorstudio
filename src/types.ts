@@ -24,6 +24,7 @@ export interface ContentDay {
   notes: string;
   contentType: 'Photo' | 'Carousel' | 'Video';
   generatedImageUrl?: string;
+  generatedVideoUrl?: string;
   status: 'draft' | 'generating' | 'completed';
   personaId: string;
   styleOption?: string;
