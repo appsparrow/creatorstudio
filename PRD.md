@@ -19,6 +19,18 @@
 ### 🏷️ **4. Status Tags (Ready/Scheduled/New/Generating)**
 - **Cards indicators overlay frame Node**: Added beautiful transparent pill framing tags setup cleanly binding forwards cleanly index templates triggers frames layouts.
 
+### 🎬 **5. Kling AI Video Pipeline & Persistence**
+- **Webhook Subscriptions**: Setup asynchronous Express proxy webhook to safely download `succeed` callbacks directly to local disk structures without tunnel timeouts.
+- **Task to Post Mapping (`video_tasks`)**: Enforced a SQLite lookup row linking temporary `taskId` dynamically safely back into specific `ContentDay` payload entries.
+- **UI Persistence State**: Bound a `pendingVideoTaskId` to frontend schemas surviving DOM refreshes, resuming loading spinners seamlessly until callback triggers.
+- **Generative Prompt Engineering**: Converted generic Kling calls dynamically into context-aware payloads feeding `Scene Description + Caption + Camera Angle`.
+
+### 📂 **6. Persona-Scoped Asset Management & UI Controls**
+- **Isolated Directories (`/uploads/{personaId}/`)**: Enforced rigid directory structures isolating downloaded MP4s, AI Images, and Reference base64 streams directly grouped into exact Identity folders.
+- **Sofia Laurant Refactor**: Reprovisioned database identities, UI schemas, and file trees cleanly over from 'Luna Croft' into 'Sofia Laurant'.
+- **Safe Persona Deletion Setup**: Configured a guarded `Danger Zone` modal layout bounding `DELETE /api/personas/:id` endpoint cleanly wiping associated SQL entries and schema tables safely over UI.
+- **Kling Version Toggles**: Implemented Settings selections extending Kling v1 models dynamically expanding out towards Kling v1.5 and v2 inputs safely cleanly.
+
 ---
 
 ## ⚡ **Technical Decisions & Pipeline auto-publishing Hooks**

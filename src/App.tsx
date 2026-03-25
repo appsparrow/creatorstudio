@@ -97,10 +97,10 @@ const compositeImageWithText = (base64: string, text: string): Promise<string> =
   });
 };
 
-const LUNA_PERSONA: Persona = {
-  id: 'persona_luna_croft_v1',
+const SOFIA_PERSONA: Persona = {
+  id: 'persona_sofia_laurant_v1',
   identity: {
-    fullName: "Luna Croft",
+    fullName: "Sofia Laurant",
     age: 24,
     gender: "female",
     nationality: "Italian",
@@ -207,9 +207,9 @@ const INITIAL_DAY = (personaId: string): ContentDay => ({
 });
 
 export default function App() {
-  const [personas, setPersonas] = useState<Persona[]>([LUNA_PERSONA]);
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string>(LUNA_PERSONA.id);
-  const [days, setDays] = useState<ContentDay[]>([INITIAL_DAY(LUNA_PERSONA.id)]);
+  const [personas, setPersonas] = useState<Persona[]>([SOFIA_PERSONA]);
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string>(SOFIA_PERSONA.id);
+  const [days, setDays] = useState<ContentDay[]>([INITIAL_DAY(SOFIA_PERSONA.id)]);
   const [selectedDayId, setSelectedDayId] = useState<string>(days[0].id);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false);
@@ -231,10 +231,8 @@ export default function App() {
   const [publicTunnelUrl, setPublicTunnelUrl] = useState<string>(localStorage.getItem('public_tunnel_url') || '');
   const [klingApiKey, setKlingApiKey] = useState<string>(localStorage.getItem('kling_api_key') || '');
   const [klingApiSecret, setKlingApiSecret] = useState<string>(localStorage.getItem('kling_api_secret') || '');
-  const [klingVariant, setKlingVariant] = useState<'kling-v1' | 'kling-v1-pro'>(
-    (localStorage.getItem('kling_variant') && localStorage.getItem('kling_variant') !== 'kling-v2-5-Turbo') 
-    ? localStorage.getItem('kling_variant') as any 
-    : 'kling-v1'
+  const [klingVariant, setKlingVariant] = useState<'kling-v1' | 'kling-v1-5' | 'kling-v1-pro' | 'kling-v2'>(
+    (localStorage.getItem('kling_variant') as any) || 'kling-v1-5'
   );
   const [nanobananaApiKey, setNanobananaApiKey] = useState<string>(localStorage.getItem('nanobanana_api_key') || '');
   const [activeImageModel, setActiveImageModel] = useState<'gemini' | 'nanobanana'>(localStorage.getItem('active_image_model') as any || 'gemini');
@@ -263,15 +261,23 @@ export default function App() {
       try {
         const pre = await fetch('/api/personas');
         const pData = await pre.json();
-        if (pData.length > 0) setPersonas(pData); else fetch('/api/personas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(LUNA_PERSONA) });
+        if (pData.length > 0) setPersonas(pData); else fetch('/api/personas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(SOFIA_PERSONA) });
 
         const dre = await fetch('/api/days');
         const dData = await dre.json();
         if (dData.length > 0) {
           setDays(dData);
           if (dData[0]) setSelectedDayId(dData[0].id);
+          // Restore in-progress video statuses from persisted pendingVideoTaskId
+          const pending: Record<string, 'idle'|'submitted'|'processing'|'done'|'failed'> = {};
+          dData.forEach((d: any) => {
+            if (d.pendingVideoTaskId && !d.generatedVideoUrl) {
+              pending[d.id] = 'processing';
+            }
+          });
+          if (Object.keys(pending).length > 0) setVideoStatus(pending);
         } else {
-           const init = INITIAL_DAY(LUNA_PERSONA.id);
+           const init = INITIAL_DAY(SOFIA_PERSONA.id);
            setDays([init]);
            setSelectedDayId(init.id);
            fetch('/api/days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(init) });
@@ -512,7 +518,32 @@ export default function App() {
     const newPersona = DEFAULT_PERSONA();
     setPersonas([...personas, newPersona]);
     setSelectedPersonaId(newPersona.id);
-    setIsPersonaModalOpen(true);
+  };
+
+  const deletePersona = (id: string) => {
+    if (personas.length <= 1) {
+      alert("You must have at least one persona.");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this persona and all of its associated days?")) return;
+    
+    fetch(`/api/personas/${id}`, { method: 'DELETE' });
+    const newPersonas = personas.filter(p => p.id !== id);
+    setPersonas(newPersonas);
+    const newDays = days.filter(d => d.personaId !== id);
+    setDays(newDays);
+    
+    const nextPersonaId = newPersonas[0].id;
+    setSelectedPersonaId(nextPersonaId);
+    if (!newDays.some(d => d.personaId === nextPersonaId)) {
+      const init = INITIAL_DAY(nextPersonaId);
+      setDays([...newDays, init]);
+      setSelectedDayId(init.id);
+      fetch('/api/days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(init) });
+    } else {
+      setSelectedDayId(newDays.find(d => d.personaId === nextPersonaId)?.id || newDays[0].id);
+    }
+    setIsPersonaModalOpen(false);
   };
 
   const handleImport = () => {
@@ -623,7 +654,7 @@ export default function App() {
     }
   };
 
-  const generateSingleImage = async (ai: any, prompt: string, text: string, styleOption?: string, extraReferenceUrls?: string[]) => {
+  const generateSingleImage = async (ai: any, prompt: string, text: string, styleOption?: string, extraReferenceUrls?: string[], personaIdOverride?: string) => {
     const finalStyle = styleOption || selectedDay?.styleOption || 'luxury';
     let finalPrompt = `${prompt} Style: ${finalStyle}. STRICTLY WEAR exactly what is described (e.g., Saree if stated). DO NOT add default jackets, suits, or blazers unless specified in prompt.`;
 
@@ -706,7 +737,7 @@ export default function App() {
     const savedResp = await fetch('/api/images/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64: compositedBase64, filename })
+      body: JSON.stringify({ base64: compositedBase64, filename, personaId: personaIdOverride || selectedPersona.id })
     });
     const savedData = await savedResp.json();
     return savedData.url;
@@ -843,6 +874,7 @@ export default function App() {
     if (!day || !day.generatedImageUrl) return alert("Image must be generated first!");
     
     setVideoStatus(s => ({ ...s, [dayId]: 'submitted' }));
+    updateDay(dayId, { pendingVideoTaskId: '__pending__' }); // mark as pending for status restore on refresh
     setIsGenerating(true);
     try {
         const base = publicTunnelUrl || window.location.origin;
@@ -855,12 +887,13 @@ export default function App() {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify({
-              prompt: `Animate this scene naturally for 5 seconds. Camera Frame Angle: ${randomAngle}. Scene: ${day.sceneDescription}`,
+              prompt: `Animate this scene naturally for 5 seconds. ${day.sceneDescription ? `Scene: ${day.sceneDescription}.` : ''} ${day.caption ? `Context: ${day.caption.slice(0, 200)}.` : ''} Camera angle: ${randomAngle}. Keep the subject's expression and mood consistent with the image.`,
               image_url: publicImageUrl,
               apiKey: klingApiKey,
               apiSecret: klingApiSecret,
               model_name: klingVariant,
-              publicTunnelUrl: publicTunnelUrl
+              publicTunnelUrl: publicTunnelUrl,
+              dayId: dayId
            })
         });
         const respText = await resp.text();
@@ -878,6 +911,8 @@ export default function App() {
                     attempts++;
                     
                     console.log(`[App] Polling Task ${vData.taskId} ... Attempt ${attempts}/${maxAttempts}`);
+                    // Update day to store actual taskId for status restoration
+                    if (attempts === 1) updateDay(dayId, { pendingVideoTaskId: vData.taskId });
                     
                     const statusResp = await fetch(`/api/videos/status/${vData.taskId}`, {
                          headers: { 
@@ -900,13 +935,12 @@ export default function App() {
                          const saveResp = await fetch('/api/videos/save', {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify({ videoUrl })
+                             body: JSON.stringify({ videoUrl, personaId: day.personaId })
                          });
                          const saveResult = await saveResp.json();
                          if (saveResult.url) {
-                         setVideoStatus(s => ({ ...s, [dayId]: 'done' }));
-                         updateDay(dayId, { generatedVideoUrl: saveResult.url });
-                             alert("Video Generated & Saved successfully!");
+                             setVideoStatus(s => ({ ...s, [dayId]: 'done' }));
+                             updateDay(dayId, { generatedVideoUrl: saveResult.url, pendingVideoTaskId: undefined });
                              return;
                          } else {
                              throw new Error("Failed to save final file locally.");
@@ -948,8 +982,10 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="p-6 border-b border-[#F3F4F6] flex justify-between items-center bg-white sticky top-0 z-10">
-                <h3 className="text-xl font-bold">Persona: {selectedPersona.identity.fullName}</h3>
+              <div className="p-6 border-b border-[#F3F4F6] flex justify-between items-center bg-white sticky top-0 z-10 w-full relative">
+                <div className="flex items-center gap-4">
+                  <h3 className="text-xl font-bold">Persona: {selectedPersona.identity.fullName}</h3>
+                </div>
                 <button onClick={() => setIsPersonaModalOpen(false)} className="text-zinc-400 hover:text-black">
                   <X className="w-6 h-6" />
                 </button>
@@ -1289,7 +1325,11 @@ export default function App() {
                                       const resp = await fetch('/api/images/save', {
                                          method: 'POST',
                                          headers: { 'Content-Type': 'application/json' },
-                                         body: JSON.stringify({ base64, filename: `persona_${selectedPersonaId}_${i}_${Date.now()}.png` })
+                                         body: JSON.stringify({ 
+                                           base64, 
+                                           filename: `persona_${selectedPersonaId}_${i}_${Date.now()}.png`,
+                                           personaId: selectedPersonaId
+                                         })
                                       });
                                       const data = await resp.json();
                                       const newPersonas = [...personas];
@@ -1331,6 +1371,22 @@ export default function App() {
                       setPersonas(newPersonas);
                     }}
                   />
+                </section>
+
+                {/* Danger Zone */}
+                <section className="pt-8 mt-8 border-t border-red-100">
+                  <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-red-500 mb-2">
+                    Danger Zone
+                  </h4>
+                  <p className="text-sm text-zinc-500 mb-4">
+                    Deleting this persona will completely remove their profile, settings, and all associated posts, images, and videos from the timeline. This action cannot be undone.
+                  </p>
+                  <button 
+                    onClick={() => deletePersona(selectedPersona.id)}
+                    className="w-full py-3 bg-red-50 text-red-700 rounded-xl hover:bg-red-100 font-bold flex items-center justify-center gap-2 transition-colors border border-red-200"
+                  >
+                    Delete Persona
+                  </button>
                 </section>
               </div>
               

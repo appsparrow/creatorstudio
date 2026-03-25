@@ -32,6 +32,12 @@ db.exec(`
     personaId TEXT NOT NULL,
     data TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS video_tasks (
+    taskId TEXT PRIMARY KEY,
+    dayId  TEXT NOT NULL,
+    createdAt INTEGER NOT NULL
+  );
 `);
 
 // API Endpoints
@@ -54,6 +60,17 @@ app.post('/api/personas', (req, res) => {
     db.prepare('INSERT OR REPLACE INTO personas (id, data) VALUES (?, ?)')
       .run(persona.id, JSON.stringify(persona));
     res.json({ success: true, id: persona.id });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/personas/:id', (req, res) => {
+  try {
+    const id = req.params.id;
+    db.prepare('DELETE FROM personas WHERE id = ?').run(id);
+    db.prepare('DELETE FROM days WHERE personaId = ?').run(id);
+    res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -96,20 +113,20 @@ app.delete('/api/days/:id', (req, res) => {
 // File Uploads (save Base64 images)
 app.post('/api/images/save', (req, res) => {
   try {
-    const { base64, filename } = req.body;
+    const { base64, filename, personaId } = req.body;
     if (!base64 || !filename) return res.status(400).json({ error: 'base64 and filename are required' });
 
-    // Ensure uploads directory exists
-    const uploadsDir = path.join(__dirname, 'public', 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
+    const uploadsDir = personaId
+      ? path.join(__dirname, 'public', 'uploads', personaId)
+      : path.join(__dirname, 'public', 'uploads');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
     const filepath = path.join(uploadsDir, filename);
     const buffer = Buffer.from(base64.split(',')[1], 'base64');
     fs.writeFileSync(filepath, buffer);
 
-    res.json({ success: true, url: `/uploads/${filename}` });
+    const relPath = personaId ? `/uploads/${personaId}/${filename}` : `/uploads/${filename}`;
+    res.json({ success: true, url: relPath });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -147,54 +164,43 @@ function generateKlingJWT(apiKey: string, apiSecret: string): string {
   return `${dataToSign}.${signature}`;
 }
 
-// Proxy Kling Video Generation to avoid CORS on client sets
+// Proxy Kling Video Generation
 app.post('/api/videos/generate', async (req, res) => {
-  const { prompt, image_url, apiKey, apiSecret, model_name } = req.body;
-  const BASE_URL = 'https://api.klingai.com';
+  const { prompt, image_url, apiKey, apiSecret, model_name, dayId, publicTunnelUrl } = req.body;
 
   if (!apiKey || !apiSecret) {
-    return res.status(400).json({ error: "Kling API Key and Secret are required for JWT signature." });
+    return res.status(400).json({ error: "Kling API Key and Secret are required." });
   }
 
-  console.log(`[Server] Proxying Kling Video Trigger for ${model_name}...`);
+  console.log(`[Server] Proxying Kling Video Trigger for ${model_name}, dayId=${dayId}...`);
   const jwt = generateKlingJWT(apiKey, apiSecret);
   let activeBaseUrl = 'https://api.klingai.com';
+
+  const buildBody = () => JSON.stringify({
+    model_name: model_name || 'kling-v1',
+    image: image_url,
+    image_url: image_url,
+    prompt: prompt,
+    duration: 5,
+    callback_url: publicTunnelUrl
+      ? `${publicTunnelUrl.replace(/\/$/, '')}/api/videos/callback`
+      : undefined
+  });
 
   try {
     let response = await fetch(`${activeBaseUrl}/v1/videos/image2video`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${jwt}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model_name: model_name || 'kling-v1',
-        image: image_url,
-        image_url: image_url,
-        prompt: prompt,
-        duration: 5,
-        callback_url: req.body.publicTunnelUrl ? `${req.body.publicTunnelUrl.replace(/\/$/, '')}/api/videos/callback` : undefined
-      })
+      headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+      body: buildBody()
     });
 
-    // Failover to Singapore Gateway if 404
     if (response.status === 404) {
-      console.log("[Server] Base API 404, falling back to Singapore Gateway...");
+      console.log("[Server] Falling back to Singapore gateway...");
       activeBaseUrl = 'https://api-singapore.klingai.com';
       response = await fetch(`${activeBaseUrl}/v1/videos/image2video`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${jwt}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model_name: model_name || 'kling-v1',
-          image: image_url,
-          image_url: image_url,
-          prompt: prompt,
-          duration: 5,
-          callback_url: req.body.publicTunnelUrl ? `${req.body.publicTunnelUrl.replace(/\/$/, '')}/api/videos/callback` : undefined
-        })
+        headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+        body: buildBody()
       });
     }
 
@@ -203,12 +209,14 @@ app.post('/api/videos/generate', async (req, res) => {
     const taskId = data.task_id || data.data?.task_id;
     if (!taskId) throw new Error(`Kling failed to return task ID. Status: ${response.status}. Reply: ${JSON.stringify(data)}`);
 
-    console.log(`[Server] Task ID Created: ${taskId}`);
+    // Store taskId → dayId mapping so the webhook can auto-link the video
+    if (dayId) {
+      db.prepare('INSERT OR REPLACE INTO video_tasks (taskId, dayId, createdAt) VALUES (?, ?, ?)')
+        .run(taskId, dayId, Date.now());
+      console.log(`[Server] Mapped taskId=${taskId} → dayId=${dayId}`);
+    }
 
-    console.log(`[Server] Task ID Created: ${taskId}`);
-
-    // Return immediately with the Task ID to empower client-side loop visibility!
-    return res.json({ success: true, taskId: taskId });
+    return res.json({ success: true, taskId });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -260,46 +268,67 @@ app.get('/api/videos/status/:taskId', async (req, res) => {
 
 app.post('/api/videos/save', async (req, res) => {
   try {
-    const { videoUrl } = req.body;
+    const { videoUrl, personaId } = req.body;
     if (!videoUrl) return res.status(400).json({ error: "videoUrl is required." });
 
     const videoResponse = await fetch(videoUrl);
     const arrayBuffer = await videoResponse.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const filename = `kling_${Date.now()}.mp4`;
-    const uploadsDir = path.join(__dirname, 'public', 'uploads');
+    const uploadsDir = personaId
+      ? path.join(__dirname, 'public', 'uploads', personaId)
+      : path.join(__dirname, 'public', 'uploads');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
     fs.writeFileSync(path.join(uploadsDir, filename), buffer);
-    res.json({ success: true, url: `/uploads/${filename}` });
+    const relPath = personaId ? `/uploads/${personaId}/${filename}` : `/uploads/${filename}`;
+    res.json({ success: true, url: relPath });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
 app.post('/api/videos/callback', async (req, res) => {
-  try {
-    console.log("[Server] Kling Callback Triggered:", JSON.stringify(req.body));
-    const data = req.body;
-    const status = data.task_status;
-    const videoUrl = data.task_result?.videos?.[0]?.url || data.video_url;
+    try {
+        console.log("[Webhook] Kling Callback:", JSON.stringify(req.body));
+        const data = req.body;
+        const taskId = data.task_id;
+        const status = data.task_status;
+        const videoUrl = data.task_result?.videos?.[0]?.url;
 
-    if (status === 'succeed' && videoUrl) {
-      console.log(`[Webhook] Success found! Saving video to local downloads...`);
-      const videoResponse = await fetch(videoUrl);
-      const arrayBuffer = await videoResponse.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const filename = `kling_callback_${Date.now()}.mp4`;
-      const uploadsDir = path.join(__dirname, 'public', 'uploads');
-      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-      fs.writeFileSync(path.join(uploadsDir, filename), buffer);
-      console.log(`[Webhook] Saved video to public/uploads/${filename}`);
+        if (status === 'succeed' && videoUrl && taskId) {
+            // Download video to local uploads
+            const videoResponse = await fetch(videoUrl);
+            const arrayBuffer = await videoResponse.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const filename = `kling_${taskId}.mp4`;
+            const uploadsDir = path.join(__dirname, 'public', 'uploads');
+            if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+            const localPath = `/uploads/${filename}`;
+            fs.writeFileSync(path.join(uploadsDir, filename), buffer);
+            console.log(`[Webhook] Saved video: ${localPath}`);
+
+            // Look up which dayId this task belongs to
+            const taskRow = db.prepare('SELECT dayId FROM video_tasks WHERE taskId = ?').get(taskId) as any;
+            if (taskRow?.dayId) {
+                const dayRow = db.prepare('SELECT data FROM days WHERE id = ?').get(taskRow.dayId) as any;
+                if (dayRow) {
+                    const dayData = JSON.parse(dayRow.data);
+                    dayData.generatedVideoUrl = localPath;
+                    dayData.status = 'completed';
+                    db.prepare('INSERT OR REPLACE INTO days (id, personaId, data) VALUES (?, ?, ?)')
+                        .run(dayData.id, dayData.personaId, JSON.stringify(dayData));
+                    console.log(`[Webhook] Auto-linked video to dayId=${taskRow.dayId}`);
+                }
+            } else {
+                console.log(`[Webhook] No dayId found for taskId=${taskId} — video saved but not linked.`);
+            }
+        }
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error("[Webhook] Error:", error);
+        res.status(500).json({ error: error.message });
     }
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("[Webhook] Webhook crash error:", error);
-    res.status(500).json({ error: error.message });
-  }
 });
 
 app.listen(PORT, () => {

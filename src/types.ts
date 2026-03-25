@@ -25,6 +25,7 @@ export interface ContentDay {
   contentType: 'Photo' | 'Carousel' | 'Video';
   generatedImageUrl?: string;
   generatedVideoUrl?: string;
+  pendingVideoTaskId?: string; // set while Kling is rendering; cleared when video lands
   status: 'draft' | 'generating' | 'completed';
   personaId: string;
   styleOption?: string;
