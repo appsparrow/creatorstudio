@@ -367,21 +367,34 @@ app.post('/api/blotato/publish', async (req, res) => {
 
         // 2. Upload Local Media to Blotato Servers natively (Bypasses Ngrok Free-Tier Anti-Phishing blocks)
         const processMedia = async (mediaPath: string) => {
-             if (mediaPath.includes('/uploads/')) {
-                 const localRelativePath = mediaPath.substring(mediaPath.indexOf('/uploads/'));
-                 const absoluteDiskPath = path.join(__dirname, 'public', localRelativePath);
-                 if (!fs.existsSync(absoluteDiskPath)) throw new Error(`Media not found locally: ${absoluteDiskPath}`);
+             // Handle local or mapped Google Drive downloads!
+             if (mediaPath.includes('/uploads/') || mediaPath.startsWith('http')) {
+                 let buffer: Buffer;
+                 let mimeType = 'image/jpeg';
+                 
+                 if (mediaPath.includes('/uploads/')) {
+                     const localRelativePath = mediaPath.substring(mediaPath.indexOf('/uploads/'));
+                     const absoluteDiskPath = path.join(__dirname, 'public', localRelativePath);
+                     if (!fs.existsSync(absoluteDiskPath)) throw new Error(`Media not found locally: ${absoluteDiskPath}`);
 
-                 console.log(`[Blotato Publisher] Processing ${localRelativePath} ...`);
-                 const buffer = fs.readFileSync(absoluteDiskPath);
-                 const mimeType = localRelativePath.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';
+                     console.log(`[Blotato Publisher] Processing local media ${localRelativePath} ...`);
+                     buffer = fs.readFileSync(absoluteDiskPath);
+                     mimeType = localRelativePath.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';
+                 } else {
+                     console.log(`[Blotato Publisher] Fetching Remote Media Buffer -> ${mediaPath} ...`);
+                     const dlRes = await fetch(mediaPath);
+                     if (!dlRes.ok) throw new Error("Failed to download remote media buffer: " + (await dlRes.text()));
+                     const arrayBuffer = await dlRes.arrayBuffer();
+                     buffer = Buffer.from(arrayBuffer);
+                     mimeType = dlRes.headers.get('content-type') || 'image/jpeg';
+                 }
                  
                  let finalBase64 = buffer.toString('base64');
                  
                  // --- CANVAS TEXT BURNER (Images Only) ---
                  if (mimeType.includes('image') && onScreenText) {
                     console.log(`[Blotato Publisher] Applying Text Burner overlay to image...`);
-                    const img = await loadImage(absoluteDiskPath);
+                    const img = await loadImage(buffer);
                     const canvas = createCanvas(img.width, img.height);
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, img.width, img.height);

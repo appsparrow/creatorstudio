@@ -44,7 +44,7 @@ import { generateVideoKling } from './services/kling';
 const formatGoogleDriveUrl = (url: string) => {
     const rx = /drive\.google\.com\/file\/d\/([-_a-zA-Z0-9]+)/;
     const m = url.match(rx);
-    if (m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+    if (m) return `https://drive.google.com/uc?export=download&id=${m[1]}`;
     return url;
 };
 
@@ -2418,7 +2418,7 @@ export default function App() {
                           className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm resize-none"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-4">
                         <div>
                           <label className="block text-xs font-semibold text-zinc-500 mb-1.5">Hook</label>
                           <input 
@@ -2429,13 +2429,52 @@ export default function App() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-zinc-500 mb-1.5">Hashtags</label>
+                          <label className="block text-xs font-semibold text-zinc-500 mb-1.5 flex items-center justify-between">
+                            <span>Hashtags (Max 5)</span>
+                            <span className="text-[10px] text-zinc-400 font-normal">Press Space or Enter to add</span>
+                          </label>
                           <input 
                             type="text"
-                            value={selectedDay.hashtags}
-                            onChange={(e) => updateDay(selectedDay.id, { hashtags: e.target.value })}
-                            className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm"
+                            placeholder={(selectedDay.hashtags?.split(/[\s#]+/).filter(Boolean).length || 0) < 5 ? "#Add new tag..." : "Limit reached (5/5)"}
+                            disabled={(selectedDay.hashtags?.split(/[\s#]+/).filter(Boolean).length || 0) >= 5}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ' || e.key === ',') {
+                                e.preventDefault();
+                                const val = (e.target as HTMLInputElement).value.replace(/[^a-zA-Z0-9_]/g, '');
+                                if (val) {
+                                  const raw = selectedDay.hashtags?.split(/[\s#]+/).filter(Boolean) || [];
+                                  if (raw.length < 5) {
+                                      const updated = [...raw, val].map(t => `#${t}`).join(' ');
+                                      updateDay(selectedDay.id, { hashtags: updated });
+                                  }
+                                  (e.target as HTMLInputElement).value = '';
+                                }
+                              }
+                            }}
+                            className={cn(
+                               "w-full border rounded-lg px-3 py-2 text-sm transition-colors mb-3",
+                               (selectedDay.hashtags?.split(/[\s#]+/).filter(Boolean).length || 0) >= 5 
+                                  ? "bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed" 
+                                  : "bg-zinc-50 border-zinc-200"
+                            )}
                           />
+                          {selectedDay.hashtags && selectedDay.hashtags.trim() !== '' && (
+                              <div className="flex flex-wrap gap-2 items-center">
+                                {selectedDay.hashtags.split(/[\s#]+/).filter(Boolean).map((tag, idx) => (
+                                  <span key={idx} className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-[10px] font-bold shadow-sm">
+                                    #{tag}
+                                    <button 
+                                      onClick={() => {
+                                        const raw = selectedDay.hashtags?.split(/[\s#]+/).filter(Boolean) || [];
+                                        const updated = raw.filter((_, i) => i !== idx).map(t => `#${t}`).join(' ');
+                                        updateDay(selectedDay.id, { hashtags: updated });
+                                      }}
+                                      className="text-blue-400 hover:text-blue-900 bg-white rounded-full p-0.5"
+                                    ><X className="w-3 h-3" /></button>
+                                  </span>
+                                ))}
+                              </div>
+                          )}
                         </div>
                       </div>
                       
