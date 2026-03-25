@@ -25,8 +25,9 @@ export interface ContentDay {
   contentType: 'Photo' | 'Carousel' | 'Video';
   generatedImageUrl?: string;
   generatedVideoUrl?: string;
+  customMediaUrl?: string;
   pendingVideoTaskId?: string; // set while Kling is rendering; cleared when video lands
-  status: 'draft' | 'generating' | 'completed';
+  status: 'draft' | 'generating' | 'completed' | 'published';
   personaId: string;
   styleOption?: string;
   isAIGenerated?: boolean;
@@ -86,5 +87,5 @@ export interface Persona {
   };
   referenceImageUrl?: string;
   referenceImageUrls?: string[];
+  aiAnalysis?: string; // Used to strictly define generation rules
 }
-

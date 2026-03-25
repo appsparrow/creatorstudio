@@ -31,6 +31,11 @@
 - **Safe Persona Deletion Setup**: Configured a guarded `Danger Zone` modal layout bounding `DELETE /api/personas/:id` endpoint cleanly wiping associated SQL entries and schema tables safely over UI.
 - **Kling Version Toggles**: Implemented Settings selections extending Kling v1 models dynamically expanding out towards Kling v1.5 and v2 inputs safely cleanly.
 
+### 🌐 **7. Direct Blotato Publisher API (N8N Bypass)**
+- **Manual Publisher**: Repurposed the previous N8N `Send` node module to hit `/api/blotato/publish` endpoints locally, mocking API payloads directly against Blotato proxies entirely securely.
+- **Local Autopost Cron**: Deployed a lightweight interval state tracker on `App.tsx` natively capturing `postingMode` & `postingTime` configs mapping against SQLite scheduled outputs (`isGoodToPost === true`).
+- **Live Status Badges**: Added a `status: 'published'` UI enum state displaying visual purple indicator pips on calendar outputs safely mapped backwards natively.
+
 ---
 
 ## ⚡ **Technical Decisions & Pipeline auto-publishing Hooks**

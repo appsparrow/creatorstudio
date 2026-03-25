@@ -12,13 +12,12 @@
     "server": "tsx server.ts",
     "start": "concurrently \"npm run server\" \"npm run dev\""
   },
-
-
   "dependencies": {
     "@google/genai": "^1.46.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "better-sqlite3": "^12.8.0",
+    "canvas": "^3.2.2",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",

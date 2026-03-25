@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { createCanvas, loadImage } from 'canvas';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -327,6 +328,207 @@ app.post('/api/videos/callback', async (req, res) => {
         res.json({ success: true });
     } catch (error: any) {
         console.error("[Webhook] Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// --- Blotato Direct Publisher Real API Integration ---
+app.post('/api/blotato/publish', async (req, res) => {
+    try {
+        const { image, video, caption, hashtags, onScreenText, contentType, blotatoApiKey, dayId } = req.body;
+        if (!blotatoApiKey) {
+            return res.status(400).json({ error: "Blotato API Key missing. Please set it in Settings." });
+        }
+
+        console.log(`\n[Blotato Publisher] Preparing live request for DayID: ${dayId}...`);
+
+        // 1. Fetch the user's connected Blotato accounts to get the required Account ID (Targeting Instagram directly)
+        const accountsRes = await fetch('https://backend.blotato.com/v2/users/me/accounts?platform=instagram', {
+            headers: { 'Authorization': `Bearer ${blotatoApiKey}`, 'x-api-key': blotatoApiKey }
+        });
+        
+        if (!accountsRes.ok) {
+            const err = await accountsRes.text();
+            throw new Error(`Failed to authenticate with Blotato: ${err}`);
+        }
+        
+        const accountsData = await accountsRes.json();
+        console.log(`[Blotato Publisher] Raw Accounts API Response:`, JSON.stringify(accountsData, null, 2));
+        
+        // Blotato docs specify response is in `{ items: [...] }`
+        const accountsArray = Array.isArray(accountsData) ? accountsData : accountsData.items || accountsData.data || [];
+        const targetAccount = accountsArray.find((acc: any) => acc.platform === 'instagram') || accountsArray[0];
+
+        if (!targetAccount || !targetAccount.id) {
+            throw new Error(`No connected Instagram account found. Blotato returned: ${JSON.stringify(accountsData)}`);
+        }
+
+        console.log(`[Blotato Publisher] Found Account ID: ${targetAccount.id}. Sending post...`);
+
+        // 2. Upload Local Media to Blotato Servers natively (Bypasses Ngrok Free-Tier Anti-Phishing blocks)
+        const processMedia = async (mediaPath: string) => {
+             if (mediaPath.includes('/uploads/')) {
+                 const localRelativePath = mediaPath.substring(mediaPath.indexOf('/uploads/'));
+                 const absoluteDiskPath = path.join(__dirname, 'public', localRelativePath);
+                 if (!fs.existsSync(absoluteDiskPath)) throw new Error(`Media not found locally: ${absoluteDiskPath}`);
+
+                 console.log(`[Blotato Publisher] Processing ${localRelativePath} ...`);
+                 const buffer = fs.readFileSync(absoluteDiskPath);
+                 const mimeType = localRelativePath.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';
+                 
+                 let finalBase64 = buffer.toString('base64');
+                 
+                 // --- CANVAS TEXT BURNER (Images Only) ---
+                 if (mimeType.includes('image') && onScreenText) {
+                    console.log(`[Blotato Publisher] Applying Text Burner overlay to image...`);
+                    const img = await loadImage(absoluteDiskPath);
+                    const canvas = createCanvas(img.width, img.height);
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, img.width, img.height);
+                    
+                    const boxWidth = img.width * 0.75;
+                    const fontSize = Math.floor(img.width * 0.038); // tighter, elegantly smaller scaling
+                    const padding = fontSize * 1.5;
+                    const lineHeight = fontSize * 1.35;
+                    
+                    ctx.font = `bold ${fontSize}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    // Flatten out AI-generated newlines into a continuous string
+                    const cleanContinuousText = onScreenText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                    const words = cleanContinuousText.split(' ');
+                    
+                    let line = '';
+                    const lines = [];
+                    for (let n = 0; n < words.length; n++) {
+                        const testLine = line + words[n] + ' ';
+                        const metrics = ctx.measureText(testLine);
+                        if (metrics.width > (boxWidth - padding * 2) && n > 0) {
+                            if (lines.length >= 2) { 
+                                // Hard cap at maximum 3 lines: replace last word logic with an ellipsis
+                                line = line.trim() + '...';
+                                break; 
+                            }
+                            lines.push(line);
+                            line = words[n] + ' ';
+                        } else {
+                            line = testLine;
+                        }
+                    }
+                    if (lines.length < 3 && line) {
+                        lines.push(line);
+                    }
+                    
+                    const boxHeight = (lines.length * lineHeight) + (padding * 1.5);
+                    const boxX = (img.width - boxWidth) / 2;
+                    const boxY = img.height - boxHeight - (img.height * 0.12); // Place 12% above bottom frame
+                    const r = Math.min(24, boxHeight / 2); // rounded corner radius
+
+                    // Background Box
+                    ctx.fillStyle = 'rgba(70, 60, 50, 0.85)';
+                    ctx.beginPath();
+                    ctx.moveTo(boxX + r, boxY);
+                    ctx.lineTo(boxX + boxWidth - r, boxY);
+                    ctx.quadraticCurveTo(boxX + boxWidth, boxY, boxX + boxWidth, boxY + r);
+                    ctx.lineTo(boxX + boxWidth, boxY + boxHeight - r);
+                    ctx.quadraticCurveTo(boxX + boxWidth, boxY + boxHeight, boxX + boxWidth - r, boxY + boxHeight);
+                    ctx.lineTo(boxX + r, boxY + boxHeight);
+                    ctx.quadraticCurveTo(boxX, boxY + boxHeight, boxX, boxY + boxHeight - r);
+                    ctx.lineTo(boxX, boxY + r);
+                    ctx.quadraticCurveTo(boxX, boxY, boxX + r, boxY);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Text
+                    ctx.fillStyle = '#ffffff';
+                    let textY = boxY + padding + (fontSize/2);
+                    for (const l of lines) {
+                        ctx.fillText(l.trim(), img.width / 2, textY);
+                        textY += lineHeight;
+                    }
+
+                    // Export the newly stamped PNG buffer directly into Base64 format!
+                    const outputBuffer = canvas.toBuffer('image/jpeg', { quality: 0.95 });
+                    finalBase64 = outputBuffer.toString('base64');
+                 }
+                 // ----------------------------------------
+                 
+                 const dataUri = `data:${mimeType};base64,${finalBase64}`;
+
+                 console.log(`[Blotato Publisher] Uploading finalized media to Blotato Hosting...`);
+                 const uploadRes = await fetch('https://backend.blotato.com/v2/media', {
+                     method: 'POST',
+                     headers: {
+                         'Authorization': `Bearer ${blotatoApiKey}`,
+                         'x-api-key': blotatoApiKey,
+                         'Content-Type': 'application/json'
+                     },
+                     body: JSON.stringify({ url: dataUri })
+                 });
+
+                 if (!uploadRes.ok) {
+                     throw new Error(`Blotato Media Upload Failed: ${await uploadRes.text()}`);
+                 }
+                 const uploadData = await uploadRes.json();
+                 console.log(`[Blotato Publisher] Media successfully uploaded onto Blotato: ${uploadData.url}`);
+                 return uploadData.url;
+             }
+             return mediaPath;
+        };
+
+        const finalMediaUrls = [];
+        if (video) finalMediaUrls.push(await processMedia(video));
+        else if (image) finalMediaUrls.push(await processMedia(image));
+
+        // 3. Prepare exact schema as requested by API v2
+        // Blotato explicitly limits Hashtags to 5 for Instagram
+        let processedHashtags = '';
+        if (hashtags) {
+            // Split by space or #, clean up, and slice to 5 max
+            const tagsArray = hashtags.split(/[\s#]+/).filter(Boolean).map((t: string) => `#${t}`);
+            processedHashtags = tagsArray.slice(0, 5).join(' ');
+        }
+
+        const finalText = `${caption ? caption.trim() : ''}\n\n${processedHashtags}`.trim();
+
+        // NOTE: We default to Instagram for Creator Studio MVP, passing data down directly
+        const postPayload = {
+            post: {
+                accountId: targetAccount.id,
+                content: {
+                    text: finalText,
+                    mediaUrls: finalMediaUrls,
+                    platform: "instagram"
+                },
+                target: {
+                    targetType: "instagram",
+                    mediaType: video ? "reel" : undefined // "reel" or "story". Undefined for photos.
+                }
+            }
+        };
+
+        const publishRes = await fetch('https://backend.blotato.com/v2/posts', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${blotatoApiKey}`,
+                'x-api-key': blotatoApiKey,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(postPayload)
+        });
+
+        if (!publishRes.ok) {
+             const postErr = await publishRes.text();
+             throw new Error(`Failed to publish post: ${postErr}`);
+        }
+
+        const publishData = await publishRes.json();
+        console.log(`[Blotato Publisher] Success: POSTED LIVE! ID: ${publishData.postSubmissionId || 'unknown'}`);
+        
+        res.json({ success: true, publishedAt: new Date().toISOString(), platformPostId: publishData.postSubmissionId });
+    } catch (error: any) {
+        console.error("[Blotato Publisher Error]", error.message);
         res.status(500).json({ error: error.message });
     }
 });

@@ -28,7 +28,8 @@ import {
   Coffee,
   X,
   AlertCircle,
-  Video
+  Video,
+  Link as LinkIcon
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -38,6 +39,14 @@ import { ContentDay, Persona } from './types';
 import { getAiInstance, GENERATION_MODEL } from './services/ai';
 import { generateImageNanoBanana } from './services/nanobanana';
 import { generateVideoKling } from './services/kling';
+
+// Helps bypass Google Drive View pages by parsing direct image paths for the preview and backend canvas.
+const formatGoogleDriveUrl = (url: string) => {
+    const rx = /drive\.google\.com\/file\/d\/([-_a-zA-Z0-9]+)/;
+    const m = url.match(rx);
+    if (m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+    return url;
+};
 
 const VIDEO_HOOK_ANGLES = [
   "Overhead/Top-Down Shot (Camera placed directly above looking down on Action focus)",
@@ -141,7 +150,8 @@ const SOFIA_PERSONA: Persona = {
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop',
     'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&h=400&fit=crop',
     'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop'
-  ]
+  ],
+  aiAnalysis: ''
 };
 
 const DEFAULT_PERSONA = (): Persona => ({
@@ -183,7 +193,8 @@ const DEFAULT_PERSONA = (): Persona => ({
     socialMediaPresence: "Instagram"
   },
   referenceImageUrl: 'https://picsum.photos/seed/new-persona/400/400',
-  referenceImageUrls: []
+  referenceImageUrls: [],
+  aiAnalysis: ''
 });
 
 const INITIAL_DAY = (personaId: string): ContentDay => ({
@@ -228,6 +239,9 @@ export default function App() {
   const [showGenerationChoice, setShowGenerationChoice] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState<string>(localStorage.getItem('n8n_webhook_url') || '');
+  const [blotatoApiKey, setBlotatoApiKey] = useState<string>(localStorage.getItem('blotato_api_key') || '');
+  const [postingMode, setPostingMode] = useState<'manual'|'auto'>(localStorage.getItem('posting_mode') as any || 'manual');
+  const [postingTime, setPostingTime] = useState<string>(localStorage.getItem('posting_time') || '09:00');
   const [publicTunnelUrl, setPublicTunnelUrl] = useState<string>(localStorage.getItem('public_tunnel_url') || '');
   const [klingApiKey, setKlingApiKey] = useState<string>(localStorage.getItem('kling_api_key') || '');
   const [klingApiSecret, setKlingApiSecret] = useState<string>(localStorage.getItem('kling_api_secret') || '');
@@ -288,6 +302,50 @@ export default function App() {
     };
     fetchData();
   }, []);
+
+  // Blotato Auto-Scheduler / Publisher Cron
+  useEffect(() => {
+    if (postingMode !== 'auto') return;
+    const interval = setInterval(() => {
+        const now = new Date();
+        const currentHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        
+        if (currentHHMM === postingTime) {
+           const todayStr = now.toISOString().split('T')[0];
+           const toPost = days.filter(d => d.date === todayStr && d.isGoodToPost && d.status !== 'published');
+           
+           toPost.forEach(async (postDay) => {
+               try {
+                   console.log(`[Auto-Cron] Firing publish sequence to Blotato for Day: ${postDay.id}`);
+                   const cleanUrl = publicTunnelUrl.endsWith('/') ? publicTunnelUrl.slice(0, -1) : publicTunnelUrl;
+                   const mappedImage = postDay.generatedImageUrl?.startsWith('/') ? `${cleanUrl}${postDay.generatedImageUrl}` : postDay.generatedImageUrl;
+                   const mappedVideo = postDay.generatedVideoUrl?.startsWith('/') ? `${cleanUrl}${postDay.generatedVideoUrl}` : postDay.generatedVideoUrl;
+
+                   const res = await fetch('/api/blotato/publish', {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({
+                           image: mappedImage,
+                           video: mappedVideo,
+                           onScreenText: postDay.onScreenText,
+                           caption: postDay.caption,
+                           hashtags: postDay.hashtags,
+                           contentType: postDay.contentType,
+                           blotatoApiKey,
+                           dayId: postDay.id
+                       })
+                   });
+                   if (res.ok) {
+                       updateDay(postDay.id, { status: 'published' });
+                   }
+               } catch (e) {
+                   console.error("Cron Blotato publish failed for", postDay.id);
+               }
+           });
+        }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [postingMode, postingTime, blotatoApiKey, days]);
 
   const selectedPersona = personas.find(p => p.id === selectedPersonaId) || personas[0];
   const personaDays = days
@@ -428,6 +486,8 @@ export default function App() {
         ]
       }
       Ensure:
+      - Limit the 'hashtags' string to exactly 5 carefully selected hashtags (Instagram maximum). Do NOT output more than 5 hashtags.
+      - Limit the 'onScreenText' string to a very short, punchy maximum of 3 lines of continuous text without excessive line breaks, tailored to easily fit on screen elegantly.
       - If "Carousel" is chosen, "slides" MUST have 4 items with variations (e.g., close-up headshot, side profile, long-distance view standing) to fit a logical sequence story.
       - Ensure scenes describe unposed CANDID or action layout moments/angles (e.g. looking away, off-center framing, action closeups). The subject should NOT face the camera static all the time.`;
 
@@ -656,8 +716,12 @@ export default function App() {
 
   const generateSingleImage = async (ai: any, prompt: string, text: string, styleOption?: string, extraReferenceUrls?: string[], personaIdOverride?: string) => {
     const finalStyle = styleOption || selectedDay?.styleOption || 'luxury';
+    const activePersona = personas.find(p => p.id === (personaIdOverride || selectedDay?.personaId || selectedPersonaId)) || selectedPersona;
     let finalPrompt = `${prompt} Style: ${finalStyle}. STRICTLY WEAR exactly what is described (e.g., Saree if stated). DO NOT add default jackets, suits, or blazers unless specified in prompt.`;
 
+    if (activePersona.aiAnalysis) {
+      finalPrompt += `\nCRITICAL IDENTITY ENFORCEMENT RULES:\n${activePersona.aiAnalysis}\nThe generated character MUST exactly map to these details.`;
+    }
     
     if (selectedDay?.postImageReferences) {
         selectedDay.postImageReferences.forEach(ref => {
@@ -1373,6 +1437,26 @@ export default function App() {
                   />
                 </section>
 
+                {/* AI Visual Archetype Section */}
+                <section>
+                  <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-indigo-500 mb-2">
+                    <Sparkles className="w-4 h-4" /> AI Image Analysis (Visual Archetype)
+                  </h4>
+                  <p className="text-xs text-zinc-500 mb-3">Copy and paste the autogenerated visual archetype JSON (or raw definitions) here to lock in these precise characteristics across all generations.</p>
+                  <textarea 
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-xs font-mono resize-y"
+                    rows={8}
+                    placeholder="{\n  'image_analysis': ...\n}"
+                    value={selectedPersona.aiAnalysis || ''}
+                    onChange={e => {
+                      const newPersonas = [...personas];
+                      const idx = newPersonas.findIndex(p => p.id === selectedPersonaId);
+                      newPersonas[idx].aiAnalysis = e.target.value;
+                      setPersonas(newPersonas);
+                    }}
+                  />
+                </section>
+
                 {/* Danger Zone */}
                 <section className="pt-8 mt-8 border-t border-red-100">
                   <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-red-500 mb-2">
@@ -1444,15 +1528,17 @@ export default function App() {
                 />
 
                 <div className="grid grid-cols-2 gap-3 pt-4 border-t border-zinc-100">
-                   <div>
-                     <label className="block text-[10px] font-bold text-zinc-500 mb-1">STARTING DATE (Assign calendars from)</label>
-                     <input 
-                       type="date"
-                       value={importStartDate}
-                       onChange={e => setImportStartDate(e.target.value)}
-                       className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-medium cursor-pointer"
-                     />
-                   </div>
+                     <div>
+                       <label htmlFor="importStartDate" className="block text-[10px] font-bold text-zinc-500 mb-1">STARTING DATE (Assign calendars from)</label>
+                       <input 
+                         id="importStartDate"
+                         name="importStartDate"
+                         type="date"
+                         value={importStartDate}
+                         onChange={e => setImportStartDate(e.target.value)}
+                         className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-medium cursor-pointer"
+                       />
+                     </div>
                    <div>
                      <label className="block text-[10px] font-bold text-zinc-500 mb-1">POSTS PER DAY FREQUENCY</label>
                      <input 
@@ -1880,19 +1966,52 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="space-y-1 opacity-60">
-                        <label className="block text-xs font-semibold text-zinc-500 mb-1">Blotato API Key</label>
+                      <div className="space-y-1">
+                        <label htmlFor="blotatoApiKey" className="block text-xs font-semibold text-zinc-500 mb-1">Blotato API Key</label>
                         <input 
+                          id="blotatoApiKey"
+                          name="blotatoApiKey"
                           type="password"
-                          className="w-full bg-zinc-100 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono"
-                          placeholder="To be wired..."
-                          disabled
+                          className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono"
+                          placeholder="blotato_xxxxxxxx"
+                          value={blotatoApiKey}
+                          onChange={(e) => setBlotatoApiKey(e.target.value)}
                         />
                       </div>
 
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label htmlFor="postingMode" className="block text-xs font-semibold text-zinc-500 mb-1">Publishing Mode</label>
+                          <select 
+                            id="postingMode"
+                            name="postingMode"
+                            value={postingMode}
+                            onChange={(e) => setPostingMode(e.target.value as any)}
+                            className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-medium cursor-pointer"
+                          >
+                            <option value="manual">Manual (via Button)</option>
+                            <option value="auto">Auto-schedule Daily</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label htmlFor="postingTime" className="block text-xs font-semibold text-zinc-500 mb-1">Daily Post Time</label>
+                          <input 
+                            id="postingTime"
+                            name="postingTime"
+                            type="time"
+                            value={postingTime}
+                            onChange={(e) => setPostingTime(e.target.value)}
+                            disabled={postingMode === 'manual'}
+                            className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
+
                       <div className="space-y-1">
-                        <label className="block text-xs font-semibold text-zinc-500 mb-1">Public Tunnel URL (Ngrok)</label>
+                        <label htmlFor="publicTunnelUrl" className="block text-xs font-semibold text-zinc-500 mb-1">Public Tunnel URL (Ngrok)</label>
                         <input 
+                          id="publicTunnelUrl"
+                          name="publicTunnelUrl"
                           type="text"
                           value={publicTunnelUrl}
                           onChange={(e) => setPublicTunnelUrl(e.target.value)}
@@ -1910,6 +2029,9 @@ export default function App() {
                            localStorage.setItem('kling_api_secret', klingApiSecret); 
                            localStorage.setItem('kling_variant', klingVariant); 
                            localStorage.setItem('n8n_webhook_url', n8nWebhookUrl); 
+                           localStorage.setItem('blotato_api_key', blotatoApiKey); 
+                           localStorage.setItem('posting_mode', postingMode); 
+                           localStorage.setItem('posting_time', postingTime); 
                            localStorage.setItem('public_tunnel_url', publicTunnelUrl); 
                            alert('Settings Saved!'); 
                            setActivePage('dashboard'); 
@@ -1979,7 +2101,8 @@ export default function App() {
                                                     <span className="text-[7.5px] font-bold uppercase text-zinc-400 bg-zinc-100 px-1 py-0.5 rounded">{dp.contentType}</span>
                                                     <div className="flex gap-1 items-center">
                                                         {dp.status === 'completed' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-sm" title="Completed" />}
-                                                        {dp.isGoodToPost && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-sm" title="Scheduled" />}
+                                                        {dp.isGoodToPost && dp.status !== 'published' && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-sm" title="Scheduled" />}
+                                                        {dp.status === 'published' && <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-sm" title="Published" />}
                                                     </div>
                                                 </div>
                                             </button>
@@ -2187,8 +2310,28 @@ export default function App() {
                         </div>
                       </div>
 
+                      <div className="mt-5 border-t border-zinc-100 pt-5">
+                          <label className="block text-xs font-semibold text-zinc-500 mb-1.5 flex items-center gap-1.5"><LinkIcon className="w-3.5 h-3.5"/> Direct Media Override (Skip AI)</label>
+                          <div className="flex gap-2 mb-2">
+                             <input 
+                               type="text" 
+                               value={selectedDay.customMediaUrl || ''}
+                               onChange={e => updateDay(selectedDay.id, { customMediaUrl: e.target.value })}
+                               placeholder="e.g. Google Drive Image Link"
+                               className="flex-1 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-xs"
+                             />
+                             <button
+                               onClick={() => {
+                                 const f = formatGoogleDriveUrl(selectedDay.customMediaUrl || '');
+                                 if (f) updateDay(selectedDay.id, { generatedImageUrl: f, customMediaUrl: f, status: 'completed' });
+                               }}
+                               className="bg-zinc-800 text-white px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap whitespace-nowrap"
+                             >Apply Link</button>
+                          </div>
+                      </div>
+
                       <div>
-                        <label className="block text-xs font-semibold text-zinc-500 mb-1.5">Scene Description (AI Prompt)</label>
+                        <label className="block text-xs font-semibold text-zinc-500 mb-1.5 mt-5">Scene Description (AI Prompt)</label>
 
                         <textarea 
                           value={selectedDay.sceneDescription}
@@ -2430,7 +2573,33 @@ export default function App() {
                                 </button>
                               )}
                               <button 
-                                onClick={(e) => { e.stopPropagation(); updateDay(selectedDay.id, { isGoodToPost: !selectedDay.isGoodToPost }); }}
+                                onClick={async (e) => {
+                                   e.stopPropagation();
+                                   const newStatus = !selectedDay.isGoodToPost;
+                                   updateDay(selectedDay.id, { isGoodToPost: newStatus });
+                                   
+                                   // Automatically trigger N8N / Blotato sequence if marked as scheduled (true)
+                                   if (newStatus && n8nWebhookUrl) {
+                                      try {
+                                         await fetch(n8nWebhookUrl, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                               image: selectedDay.generatedImageUrl,
+                                               video: selectedDay.generatedVideoUrl,
+                                               caption: selectedDay.caption,
+                                               hashtags: selectedDay.hashtags,
+                                               contentType: selectedDay.contentType,
+                                               blotatoApiKey: blotatoApiKey || undefined,
+                                               status: 'scheduled'
+                                            })
+                                         });
+                                         alert("Post automatically forwarded to N8N/Blotato for scheduling!");
+                                      } catch (err) {
+                                         console.error("Failed to auto-trigger Webhook", err);
+                                      }
+                                   }
+                                }}
                                 className={cn(
                                   "p-2 rounded-full shadow-lg backdrop-blur-md transition-all",
                                   selectedDay.isGoodToPost ? "bg-green-500 text-white" : "bg-white/80 text-zinc-700 hover:bg-white"
@@ -2439,25 +2608,42 @@ export default function App() {
                                 <CheckCircle2 className="w-5 h-5" />
                               </button>
                               <button 
-                                onClick={async () => {
-                                   if (!n8nWebhookUrl) return alert("Configure N8N Webhook in Settings!");
+                                onClick={async (e) => {
+                                   e.stopPropagation();
+                                   if (!blotatoApiKey) return alert("Configure your Blotato API Key in Settings first!");
+                                   if (!publicTunnelUrl && (selectedDay.generatedImageUrl?.startsWith('/uploads') || selectedDay.generatedVideoUrl?.startsWith('/uploads'))) return alert("A Public Tunnel URL is needed to share local files! Please add your Ngrok URL in Settings.");
+
                                    try {
-                                      await fetch(n8nWebhookUrl, {
+                                      const cleanUrl = publicTunnelUrl.endsWith('/') ? publicTunnelUrl.slice(0, -1) : publicTunnelUrl;
+                                      const mappedImage = selectedDay.generatedImageUrl?.startsWith('/') ? `${cleanUrl}${selectedDay.generatedImageUrl}` : selectedDay.generatedImageUrl;
+                                      const mappedVideo = selectedDay.generatedVideoUrl?.startsWith('/') ? `${cleanUrl}${selectedDay.generatedVideoUrl}` : selectedDay.generatedVideoUrl;
+
+                                      // Tell Blotato to post
+                                      const res = await fetch('/api/blotato/publish', {
                                          method: 'POST',
                                          headers: { 'Content-Type': 'application/json' },
                                          body: JSON.stringify({
-                                            image: selectedDay.generatedImageUrl,
-                                            video: selectedDay.generatedVideoUrl,
+                                            image: mappedImage,
+                                            video: mappedVideo,
                                             caption: selectedDay.caption,
                                             hashtags: selectedDay.hashtags,
-                                            contentType: selectedDay.contentType
+                                            onScreenText: selectedDay.onScreenText,
+                                            contentType: selectedDay.contentType,
+                                            blotatoApiKey,
+                                            dayId: selectedDay.id
                                          })
                                       });
-                                      alert("Trigger sent to N8N!");
-                                   } catch (e) { alert("Failed to trigger N8N"); }
+                                      if (res.ok) {
+                                        alert("Published successfully via Blotato!");
+                                        updateDay(selectedDay.id, { status: 'published' });
+                                      } else {
+                                        const errorData = await res.json();
+                                        throw new Error(errorData.error || "API Post failed");
+                                      }
+                                   } catch (e: any) { alert(`Failed to publish to Blotato: ${e.message}`); }
                                 }}
                                 className="p-2 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all"
-                                title="Publish to N8N"
+                                title="Publish Direct to Channels (Blotato)"
                               >
                                 <Send className="w-5 h-5" />
                               </button>
