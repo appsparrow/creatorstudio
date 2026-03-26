@@ -29,6 +29,7 @@ import {
   X,
   AlertCircle,
   Video,
+  Edit3,
   Link as LinkIcon
 } from 'lucide-react';
 
@@ -40,11 +41,22 @@ import { getAiInstance, GENERATION_MODEL } from './services/ai';
 import { generateImageNanoBanana } from './services/nanobanana';
 import { generateVideoKling } from './services/kling';
 
-// Helps bypass Google Drive View pages by parsing direct image paths for the preview and backend canvas.
 const formatGoogleDriveUrl = (url: string) => {
-    const rx = /drive\.google\.com\/file\/d\/([-_a-zA-Z0-9]+)/;
-    const m = url.match(rx);
-    if (m) return `https://drive.google.com/uc?export=download&id=${m[1]}`;
+    if (!url) return url;
+    try {
+        const u = new URL(url);
+        if (u.hostname.includes('drive.google.com')) {
+           const rx = /\/file\/d\/([-_a-zA-Z0-9]+)/;
+           const m = url.match(rx);
+           if (m) {
+               return `https://drive.google.com/uc?export=download&id=${m[1]}`;
+           }
+           const id = u.searchParams.get('id');
+           if (id) {
+               return `https://drive.google.com/uc?export=download&id=${id}`;
+           }
+        }
+    } catch(e) {}
     return url;
 };
 
@@ -306,46 +318,80 @@ export default function App() {
   // Blotato Auto-Scheduler / Publisher Cron
   useEffect(() => {
     if (postingMode !== 'auto') return;
+    
+    // We keep a small local ref to prevent the strictly 1-minute long condition from double-firing
+    let hasTriggeredThisMinute = false;
+
     const interval = setInterval(() => {
         const now = new Date();
         const currentHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         
-        if (currentHHMM === postingTime) {
+        if (currentHHMM !== postingTime) {
+            hasTriggeredThisMinute = false; 
+            return;
+        }
+
+        if (currentHHMM === postingTime && !hasTriggeredThisMinute) {
+           hasTriggeredThisMinute = true;
            const todayStr = now.toISOString().split('T')[0];
            const toPost = days.filter(d => d.date === todayStr && d.isGoodToPost && d.status !== 'published');
            
-           toPost.forEach(async (postDay) => {
-               try {
-                   console.log(`[Auto-Cron] Firing publish sequence to Blotato for Day: ${postDay.id}`);
-                   const cleanUrl = publicTunnelUrl.endsWith('/') ? publicTunnelUrl.slice(0, -1) : publicTunnelUrl;
-                   const mappedImage = postDay.generatedImageUrl?.startsWith('/') ? `${cleanUrl}${postDay.generatedImageUrl}` : postDay.generatedImageUrl;
-                   const mappedVideo = postDay.generatedVideoUrl?.startsWith('/') ? `${cleanUrl}${postDay.generatedVideoUrl}` : postDay.generatedVideoUrl;
+           if (toPost.length > 0) {
+               console.log(`[Auto-Cron] Found ${toPost.length} scheduled posts for today at ${postingTime}. Firing sequential matrix with breathers...`);
+               
+               // Spin up a background sequential queue processor!
+               (async () => {
+                   for (let i = 0; i < toPost.length; i++) {
+                       const postDay = toPost[i];
+                       try {
+                           console.log(`[Auto-Cron] Delivering post ${i+1}/${toPost.length} to Blotato... (Day ID: ${postDay.id})`);
+                           const cleanUrl = publicTunnelUrl.endsWith('/') ? publicTunnelUrl.slice(0, -1) : publicTunnelUrl;
+                           const mappedImage = postDay.generatedImageUrl?.startsWith('/') ? `${cleanUrl}${postDay.generatedImageUrl}` : postDay.generatedImageUrl;
+                           let mappedVideo = postDay.generatedVideoUrl?.startsWith('/') ? `${cleanUrl}${postDay.generatedVideoUrl}` : postDay.generatedVideoUrl;
 
-                   const res = await fetch('/api/blotato/publish', {
-                       method: 'POST',
-                       headers: { 'Content-Type': 'application/json' },
-                       body: JSON.stringify({
-                           image: mappedImage,
-                           video: mappedVideo,
-                           onScreenText: postDay.onScreenText,
-                           caption: postDay.caption,
-                           hashtags: postDay.hashtags,
-                           contentType: postDay.contentType,
-                           blotatoApiKey,
-                           dayId: postDay.id
-                       })
-                   });
-                   if (res.ok) {
-                       updateDay(postDay.id, { status: 'published' });
+                           // Handle Google Drive / Remote override dynamically during auto-posting too!
+                           if (postDay.customMediaUrl) {
+                               mappedVideo = postDay.customMediaUrl;
+                           }
+
+                           const res = await fetch('/api/blotato/publish', {
+                               method: 'POST',
+                               headers: { 'Content-Type': 'application/json' },
+                               body: JSON.stringify({
+                                   image: postDay.customMediaUrl ? undefined : mappedImage,
+                                   video: mappedVideo,
+                                   onScreenText: postDay.onScreenText,
+                                   caption: postDay.caption,
+                                   hashtags: postDay.hashtags,
+                                   contentType: postDay.contentType,
+                                   blotatoApiKey,
+                                   dayId: postDay.id
+                               })
+                           });
+                           if (res.ok) {
+                               updateDay(postDay.id, { status: 'published' });
+                               console.log(`[Auto-Cron] Successfully locked post ${i+1} as Published.`);
+                           } else {
+                               console.error(`[Auto-Cron] Blotato explicitly rejected post ${i+1}`);
+                           }
+                       } catch (e) {
+                           console.error(`[Auto-Cron] Critical network failure for post ${i+1}`, e);
+                       }
+                       
+                       // Inject breather space between sequential posts to avoid API flood
+                       if (i < toPost.length - 1) {
+                           console.log("[Auto-Cron] Inducing 2-minute API breather before next delivery...");
+                           await new Promise(r => setTimeout(r, 120000));
+                       }
                    }
-               } catch (e) {
-                   console.error("Cron Blotato publish failed for", postDay.id);
-               }
-           });
+                   console.log("[Auto-Cron] Daily Publishing matrix complete!");
+               })();
+           }
         }
-    }, 60000);
+    }, 30000); // Check every 30 seconds
+
     return () => clearInterval(interval);
-  }, [postingMode, postingTime, blotatoApiKey, days]);
+  }, [postingMode, postingTime, blotatoApiKey, days, publicTunnelUrl]);
 
   const selectedPersona = personas.find(p => p.id === selectedPersonaId) || personas[0];
   const personaDays = days
@@ -574,8 +620,17 @@ export default function App() {
     }
   };
 
-  const addNewPersona = () => {
+  const addNewPersona = async () => {
     const newPersona = DEFAULT_PERSONA();
+    newPersona.id = `persona_${newPersona.id.substring(0,8)}`; // Give a clean readable namespace for local fs mapping
+    
+    // Immediately scaffold the persona into SQLite and build its dedicated folder on the server
+    await fetch('/api/personas', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(newPersona) 
+    });
+
     setPersonas([...personas, newPersona]);
     setSelectedPersonaId(newPersona.id);
   };
@@ -897,7 +952,8 @@ export default function App() {
                     apiKey: klingApiKey,
                     apiSecret: klingApiSecret,
                     model_name: klingVariant,
-                    publicTunnelUrl: publicTunnelUrl
+                    publicTunnelUrl: publicTunnelUrl,
+                    dayId: selectedDayId
                  })
               });
               const respText = await resp.text();
@@ -1747,26 +1803,20 @@ export default function App() {
       {/* Content Sidebar */}
       <aside className="w-64 border-r border-[#E5E7EB] bg-white flex flex-col">
         <div className="p-6 border-b border-[#F3F4F6]">
-          <div className="mb-4">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">Current Persona</h2>
-            <h1 className="font-bold text-lg tracking-tight truncate">{selectedPersona.identity.fullName}</h1>
-            <p className="text-[10px] text-zinc-400 font-medium uppercase tracking-tighter truncate">{selectedPersona.identity.profession}</p>
-          </div>
-
-          <div className="flex gap-2 mb-6">
-            <button 
-              onClick={() => setIsPersonaModalOpen(true)}
-              className="flex-1 text-xs bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-600 font-bold py-1.5 rounded-lg flex items-center justify-center gap-1 shadow-sm"
-            >
-              <User className="w-3.5 h-3.5" /> Edit Persona
-            </button>
-            <button 
-              onClick={addNewPersona}
-              className="text-xs bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-600 font-bold px-3 py-1.5 rounded-lg flex items-center justify-center"
-              title="Add New Persona"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
+          <div className="mb-6">
+            <h2 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Current Persona</h2>
+            <div className="flex justify-between items-start gap-2">
+              <div className="overflow-hidden flex-1">
+                <h1 className="font-extrabold text-[#111827] text-[18px] tracking-tight truncate leading-tight">{selectedPersona.identity.fullName}</h1>
+                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-tighter truncate mt-0.5">{selectedPersona.identity.profession}</p>
+              </div>
+              <button 
+                onClick={() => setIsPersonaModalOpen(true)}
+                className="flex-shrink-0 text-[10px] font-bold text-zinc-500 hover:text-black bg-[#F3F4F6] hover:bg-[#E5E7EB] px-2 py-1 rounded-lg transition-colors flex items-center gap-1 shadow-sm mt-0.5"
+              >
+                <Edit3 className="w-3 h-3" /> Edit
+              </button>
+            </div>
           </div>
           
           <div className="space-y-1.5">
@@ -1856,12 +1906,14 @@ export default function App() {
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className={cn(
                         "text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider scale-90 -translate-x-0.5",
+                        day.status === 'published' ? "bg-purple-100 text-purple-700" :
                         day.isGoodToPost ? "bg-green-100 text-green-700" : 
                         day.status === 'completed' ? "bg-blue-100 text-blue-700" :
                         day.status === 'generating' ? "bg-amber-100 text-amber-700 animate-pulse" : 
                         "bg-zinc-100 text-zinc-500"
                       )}>
-                        {day.isGoodToPost ? "Scheduled" : 
+                        {day.status === 'published' ? "Posted" : 
+                         day.isGoodToPost ? "Scheduled" : 
                          day.status === 'completed' ? "Generated" :
                          day.status === 'generating' ? "Generating" : "New"}
                       </span>
@@ -1961,6 +2013,8 @@ export default function App() {
                              >
                                <option value="kling-v1">Kling v1 (Standard)</option>
                                <option value="kling-v1-pro">Kling v1 Pro (High Quality)</option>
+                               <option value="kling-v1-5">Kling 1.5 (Pro Architecture)</option>
+                               <option value="kling-v3">Kling 3.0 (Latest Anti-Deformation)</option>
                              </select>
                            </div>
                         </div>
@@ -2045,19 +2099,19 @@ export default function App() {
         <div className="max-w-6xl mx-auto p-8">
 
           {viewMode === 'calendar' ? (
-             <div className="bg-white rounded-3xl p-6 border border-zinc-100 shadow-xl max-h-[85vh] overflow-y-auto">
-                 <h2 className="text-xl font-bold mb-4 tracking-tight flex items-center gap-2">
+             <div className="bg-white rounded-[2rem] p-6 border border-zinc-100 shadow-xl h-[calc(100vh-4rem)] overflow-y-auto flex flex-col">
+                 <h2 className="text-xl font-bold mb-4 tracking-tight flex items-center gap-2 flex-shrink-0">
                     <Calendar className="w-5 h-5 text-zinc-600" />
                     Content Schedule Month View
                  </h2>
-                 <p className="text-xs text-zinc-400 mb-6 font-medium">Click on any Scheduled meeting post card node to instantly load its dashboard configurations setup list flawlessly index Node triggers flawless!</p>
+                 <p className="text-xs text-zinc-400 mb-6 font-medium flex-shrink-0">Click on any Scheduled meeting post card node to instantly load its dashboard configurations setup list flawlessly index Node triggers flawless!</p>
 
                  {(() => {
                     const uniqueDates = [...new Set(personaDays.map(d => d.date))].sort();
-                    if (uniqueDates.length === 0) return <div className="p-8 text-center text-zinc-400 text-xs">No posts scheduled yet! Import or Add days to get started.</div>;
+                    if (uniqueDates.length === 0) return <div className="p-8 text-center text-zinc-400 text-xs flex-1 flex items-center justify-center">No posts scheduled yet! Import or Add days to get started.</div>;
 
                     return (
-                      <div className="space-y-4">
+                      <div className="space-y-4 flex-1">
                          {uniqueDates.map((dateStr: any) => {
                              const dayItems = personaDays.filter(d => d.date === dateStr);
                              return (
@@ -2100,9 +2154,9 @@ export default function App() {
                                                 <div className="flex items-center justify-between mt-1">
                                                     <span className="text-[7.5px] font-bold uppercase text-zinc-400 bg-zinc-100 px-1 py-0.5 rounded">{dp.contentType}</span>
                                                     <div className="flex gap-1 items-center">
-                                                        {dp.status === 'completed' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-sm" title="Completed" />}
-                                                        {dp.isGoodToPost && dp.status !== 'published' && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-sm" title="Scheduled" />}
-                                                        {dp.status === 'published' && <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-sm" title="Published" />}
+                                                        {dp.status === 'published' ? <span className="text-[8px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">Posted</span> :
+                                                         dp.isGoodToPost ? <span className="text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">Scheduled</span> :
+                                                         dp.status === 'completed' && <span className="text-[8px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">Generated</span>}
                                                     </div>
                                                 </div>
                                             </button>
@@ -2124,6 +2178,9 @@ export default function App() {
                     <span>{new Date(selectedDay.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                   </div>
                   <h2 className="text-3xl font-bold tracking-tight">{selectedDay.theme}</h2>
+                  <div className="mt-2 text-[10px] text-zinc-400 font-mono bg-zinc-100/80 px-2 py-0.5 rounded border border-zinc-200 uppercase tracking-widest self-start inline-block">
+                    ID: {selectedDay.id}
+                  </div>
                 </div>
                 
                 <div className="flex gap-3">

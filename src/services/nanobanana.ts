@@ -22,21 +22,19 @@ export interface NanoBananaResponse {
 const BASE_URL = 'https://api.nanobananaapi.ai';
 
 export async function generateImageNanoBanana(request: NanoBananaGenerateRequest, apiKey: string): Promise<string> {
-  const endpoint = request.type === 'IMAGETOIAMGE' ? '/api/v1/nanobanana/generate' : '/api/v1/nanobanana/generate'; // Both use same endpoint usually, or check v2
-  // Wait, let's use nanobanana or nanobanana2. The user might want either. Let's use /api/v1/nanobanana/generate as base.
+  const endpoint = request.type === 'IMAGETOIAMGE' ? '/api/v1/nanobanana/generate' : '/api/v1/nanobanana/generate'; 
   
-  const headers = {
-    'Authorization': `Bearer ${apiKey}`,
-    'Content-Type': 'application/json'
-  };
-
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
+  const response = await fetch('/api/nanobanana/proxy', {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      ...request,
-      numImages: request.numImages || 1,
-      image_size: request.image_size || '4:5',
+      endpoint,
+      apiKey,
+      payload: {
+        ...request,
+        numImages: request.numImages || 1,
+        image_size: request.image_size || '4:5',
+      }
     })
   });
 
@@ -57,8 +55,14 @@ export async function generateImageNanoBanana(request: NanoBananaGenerateRequest
     await new Promise(resolve => setTimeout(resolve, pollInterval));
     attempts++;
 
-    const statusResponse = await fetch(`${BASE_URL}/api/v1/nanobanana/record-info?taskId=${taskId}`, {
-      headers
+    const statusResponse = await fetch('/api/nanobanana/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: `/api/v1/nanobanana/record-info?taskId=${taskId}`,
+        method: 'GET',
+        apiKey
+      })
     });
     const statusData: NanoBananaResponse = await statusResponse.json();
 

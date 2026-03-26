@@ -58,6 +58,10 @@ app.post('/api/personas', (req, res) => {
     const persona = req.body;
     if (!persona.id) return res.status(400).json({ error: 'id is required' });
 
+    // Scaffolds the persona's dedicated physical storage namespace independently instantly 
+    const uploadsDir = path.join(__dirname, 'public', 'uploads', persona.id);
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
     db.prepare('INSERT OR REPLACE INTO personas (id, data) VALUES (?, ?)')
       .run(persona.id, JSON.stringify(persona));
     res.json({ success: true, id: persona.id });
@@ -164,6 +168,29 @@ function generateKlingJWT(apiKey: string, apiSecret: string): string {
 
   return `${dataToSign}.${signature}`;
 }
+
+// Proxy NanoBanana API
+app.post('/api/nanobanana/proxy', async (req, res) => {
+  try {
+    const { endpoint, method, payload, apiKey } = req.body;
+    if (!endpoint || !apiKey) return res.status(400).json({ error: "Missing proxy requirements" });
+
+    const response = await fetch(`https://api.nanobananaapi.ai${endpoint}`, {
+      method: method || 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: method === 'GET' ? undefined : JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    res.json(data);
+  } catch (err: any) {
+    console.error("[NanoBanana Proxy] Failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Proxy Kling Video Generation
 app.post('/api/videos/generate', async (req, res) => {
