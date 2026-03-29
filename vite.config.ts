@@ -16,12 +16,10 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
-        '/api': 'http://localhost:3001',
-        '/uploads': 'http://localhost:3001',
+        '/api': env.VITE_API_URL || 'http://localhost:3001',
+        '/uploads': env.VITE_API_URL || 'http://localhost:3001',
       },
     },
   };

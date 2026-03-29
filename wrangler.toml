@@ -1,0 +1,10 @@
+# Cloudflare Pages configuration for Creator Studio frontend
+name = "creatorstudio"
+compatibility_date = "2024-12-01"
+pages_build_output_dir = "dist"
+
+[vars]
+# Set these in Cloudflare Dashboard > Pages > Settings > Environment variables
+# VITE_SUPABASE_URL = ""
+# VITE_SUPABASE_ANON_KEY = ""
+# VITE_API_URL = ""

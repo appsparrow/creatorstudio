@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+# Wrangler local dev secrets (never commit)
+.dev.vars
+worker/.dev.vars

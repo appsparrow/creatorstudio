@@ -1,0 +1,30 @@
+name = "creatorstudio-worker"
+main = "src/index.ts"
+compatibility_date = "2025-03-28"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+# -----------------------------------------------------------------------
+# Environment variables are declared here as placeholders.
+# Set the real values with:
+#   wrangler secret put SUPABASE_URL
+#   wrangler secret put SUPABASE_ANON_KEY
+#   wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#   wrangler secret put DRIVE_API_KEY
+#   wrangler secret put GEMINI_API_KEY
+# -----------------------------------------------------------------------
+[vars]
+SUPABASE_URL = ""
+SUPABASE_ANON_KEY = ""
+SUPABASE_SERVICE_ROLE_KEY = ""
+DRIVE_API_KEY = ""
+GEMINI_API_KEY = ""
+
+# Local dev: copy these into a .dev.vars file (git-ignored) instead of
+# editing this file, so secrets never land in source control.
+# .dev.vars format:
+#   SUPABASE_URL=https://xxxx.supabase.co
+#   SUPABASE_ANON_KEY=eyJ...
+#   etc.

@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "creatorstudio",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -10,10 +10,15 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "server": "tsx server.ts",
-    "start": "concurrently \"npm run server\" \"npm run dev\""
+    "start": "concurrently \"npm run server\" \"npm run dev\"",
+    "worker:dev": "cd worker && npx wrangler dev",
+    "worker:deploy": "cd worker && npx wrangler deploy",
+    "deploy": "npm run build && npx wrangler pages deploy dist",
+    "migrate": "npx tsx scripts/migrate-to-supabase.ts"
   },
   "dependencies": {
     "@google/genai": "^1.46.0",
+    "@supabase/supabase-js": "^2.100.1",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "better-sqlite3": "^12.8.0",
