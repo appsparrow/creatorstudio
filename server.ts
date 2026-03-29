@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createCanvas, loadImage } from 'canvas';
+import 'dotenv/config';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +39,20 @@ db.exec(`
     taskId TEXT PRIMARY KEY,
     dayId  TEXT NOT NULL,
     createdAt INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS drive_assets (
+    id TEXT PRIMARY KEY,
+    driveFileId TEXT UNIQUE NOT NULL,
+    fileName TEXT NOT NULL,
+    mimeType TEXT NOT NULL,
+    fileSize INTEGER,
+    driveUrl TEXT,
+    thumbnailUrl TEXT,
+    contentType TEXT DEFAULT 'Photo',
+    status TEXT DEFAULT 'unused',
+    linkedDayId TEXT,
+    syncedAt INTEGER NOT NULL
   );
 `);
 
@@ -571,6 +586,135 @@ app.post('/api/blotato/publish', async (req, res) => {
         console.error("[Blotato Publisher Error]", error.message);
         res.status(500).json({ error: error.message });
     }
+});
+
+// =========== Google Drive Public Folder Listing ===========
+
+const extractFolderId = (url: string): string | null => {
+  // Handle: https://drive.google.com/drive/folders/FOLDER_ID?usp=sharing
+  const match = url.match(/\/folders\/([-_a-zA-Z0-9]+)/);
+  return match ? match[1] : null;
+};
+
+app.post('/api/drive/list', async (req, res) => {
+  try {
+    const { folderUrl } = req.body;
+    const folderId = extractFolderId(folderUrl);
+    if (!folderId) return res.status(400).json({ error: 'Invalid Google Drive folder URL' });
+
+    const apiKey = process.env.DRIVE_API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(400).json({ error: 'No Google API key configured in .env' });
+
+    console.log(`[Drive] Listing files in folder: ${folderId}`);
+
+    const allFiles: any[] = [];
+    let pageToken = '';
+
+    do {
+      const params = new URLSearchParams({
+        q: `'${folderId}' in parents and trashed = false and (mimeType contains 'image/' or mimeType contains 'video/')`,
+        fields: 'nextPageToken, files(id, name, mimeType, size, webContentLink, thumbnailLink, createdTime)',
+        pageSize: '100',
+        key: apiKey,
+        orderBy: 'createdTime desc',
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+
+      const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`);
+      if (!driveRes.ok) {
+        const errText = await driveRes.text();
+        console.error('[Drive] API error:', errText);
+        throw new Error(`Drive API error: ${driveRes.status} - ${errText}`);
+      }
+      const data = await driveRes.json();
+      allFiles.push(...(data.files || []));
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+
+    console.log(`[Drive] Found ${allFiles.length} media files`);
+
+    // Upsert into drive_assets table
+    const upsert = db.prepare(`
+      INSERT OR REPLACE INTO drive_assets (id, driveFileId, fileName, mimeType, fileSize, driveUrl, thumbnailUrl, contentType, status, syncedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT status FROM drive_assets WHERE driveFileId = ?), 'unused'), ?)
+    `);
+
+    const now = Date.now();
+    for (const f of allFiles) {
+      const isVideo = f.mimeType?.startsWith('video/');
+      const driveUrl = `https://drive.google.com/uc?export=download&id=${f.id}`;
+      upsert.run(
+        f.id, f.id, f.name, f.mimeType || '', parseInt(f.size || '0'),
+        driveUrl, f.thumbnailLink || '', isVideo ? 'Video' : 'Photo',
+        f.id, now
+      );
+    }
+
+    res.json({
+      files: allFiles.map(f => ({
+        id: f.id,
+        name: f.name,
+        mimeType: f.mimeType,
+        size: f.size,
+        thumbnailLink: f.thumbnailLink,
+        driveUrl: `https://drive.google.com/uc?export=download&id=${f.id}`,
+        contentType: f.mimeType?.startsWith('video/') ? 'Video' : 'Photo',
+        createdTime: f.createdTime
+      })),
+      total: allFiles.length
+    });
+  } catch (error: any) {
+    console.error('[Drive] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get synced drive assets with filtering
+app.get('/api/drive/assets', (req, res) => {
+  try {
+    const { status, contentType } = req.query;
+    let sql = 'SELECT * FROM drive_assets WHERE 1=1';
+    const params: any[] = [];
+    if (status) { sql += ' AND status = ?'; params.push(status); }
+    if (contentType) { sql += ' AND contentType = ?'; params.push(contentType); }
+    sql += ' ORDER BY syncedAt DESC';
+    const rows = db.prepare(sql).all(...params);
+    res.json(rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update drive asset status
+app.patch('/api/drive/assets/:id', (req, res) => {
+  try {
+    const { status, linkedDayId } = req.body;
+    const updates: string[] = [];
+    const params: any[] = [];
+    if (status) { updates.push('status = ?'); params.push(status); }
+    if (linkedDayId) { updates.push('linkedDayId = ?'); params.push(linkedDayId); }
+    if (updates.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+    params.push(req.params.id);
+    db.prepare(`UPDATE drive_assets SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Drive stats
+app.get('/api/drive/stats', (req, res) => {
+  try {
+    const total = (db.prepare('SELECT COUNT(*) as c FROM drive_assets').get() as any).c;
+    const unused = (db.prepare("SELECT COUNT(*) as c FROM drive_assets WHERE status = 'unused'").get() as any).c;
+    const queued = (db.prepare("SELECT COUNT(*) as c FROM drive_assets WHERE status = 'queued'").get() as any).c;
+    const published = (db.prepare("SELECT COUNT(*) as c FROM drive_assets WHERE status = 'published'").get() as any).c;
+    const photos = (db.prepare("SELECT COUNT(*) as c FROM drive_assets WHERE contentType = 'Photo'").get() as any).c;
+    const videos = (db.prepare("SELECT COUNT(*) as c FROM drive_assets WHERE contentType = 'Video'").get() as any).c;
+    res.json({ total, unused, queued, published, photos, videos });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.listen(PORT, () => {

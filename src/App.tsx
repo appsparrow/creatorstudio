@@ -242,7 +242,7 @@ export default function App() {
   const [importJson, setImportJson] = useState('');
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [importStartDate, setImportStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [postsPerDay, setPostsPerDay] = useState(1);
+  const [postsPerDay, setPostsPerDay] = useState(parseInt(localStorage.getItem('posts_per_day') || '1'));
   const [avoidDuplicates, setAvoidDuplicates] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [videoStatus, setVideoStatus] = useState<Record<string, 'idle'|'submitted'|'processing'|'done'|'failed'>>({});
@@ -254,7 +254,12 @@ export default function App() {
   const [blotatoApiKey, setBlotatoApiKey] = useState<string>(localStorage.getItem('blotato_api_key') || '');
   const [postingMode, setPostingMode] = useState<'manual'|'auto'>(localStorage.getItem('posting_mode') as any || 'manual');
   const [postingTime, setPostingTime] = useState<string>(localStorage.getItem('posting_time') || '09:00');
+  const [postingEndTime, setPostingEndTime] = useState<string>(localStorage.getItem('posting_end_time') || '21:00');
   const [publicTunnelUrl, setPublicTunnelUrl] = useState<string>(localStorage.getItem('public_tunnel_url') || '');
+  const [driveFolderUrl, setDriveFolderUrl] = useState<string>(localStorage.getItem('drive_folder_url') || '');
+  const [driveFiles, setDriveFiles] = useState<any[]>([]);
+  const [isDriveSyncing, setIsDriveSyncing] = useState(false);
+  const [showDrivePicker, setShowDrivePicker] = useState(false);
   const [klingApiKey, setKlingApiKey] = useState<string>(localStorage.getItem('kling_api_key') || '');
   const [klingApiSecret, setKlingApiSecret] = useState<string>(localStorage.getItem('kling_api_secret') || '');
   const [klingVariant, setKlingVariant] = useState<'kling-v1' | 'kling-v1-5' | 'kling-v1-pro' | 'kling-v2'>(
@@ -315,83 +320,86 @@ export default function App() {
     fetchData();
   }, []);
 
-  // Blotato Auto-Scheduler / Publisher Cron
+  // Blotato Auto-Scheduler / Publisher Cron (supports multiple posts per day)
   useEffect(() => {
     if (postingMode !== 'auto') return;
-    
-    // We keep a small local ref to prevent the strictly 1-minute long condition from double-firing
-    let hasTriggeredThisMinute = false;
+
+    // Calculate posting slots based on postsPerDay and time window
+    const getPostingSlots = () => {
+      const [sh, sm] = postingTime.split(':').map(Number);
+      const [eh, em] = postingEndTime.split(':').map(Number);
+      const startMin = sh * 60 + sm;
+      const endMin = eh * 60 + em;
+      const gap = postsPerDay > 1 ? Math.floor((endMin - startMin) / (postsPerDay - 1)) : 0;
+      return Array.from({ length: postsPerDay }, (_, i) => {
+        const mins = Math.min(startMin + gap * i, endMin);
+        const h = Math.floor(mins / 60).toString().padStart(2, '0');
+        const m = (mins % 60).toString().padStart(2, '0');
+        return `${h}:${m}`;
+      });
+    };
+
+    const triggeredSlots = new Set<string>();
 
     const interval = setInterval(() => {
         const now = new Date();
         const currentHHMM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-        
-        if (currentHHMM !== postingTime) {
-            hasTriggeredThisMinute = false; 
-            return;
-        }
+        const todayStr = now.toISOString().split('T')[0];
 
-        if (currentHHMM === postingTime && !hasTriggeredThisMinute) {
-           hasTriggeredThisMinute = true;
-           const todayStr = now.toISOString().split('T')[0];
-           const toPost = days.filter(d => d.date === todayStr && d.isGoodToPost && d.status !== 'published');
-           
-           if (toPost.length > 0) {
-               console.log(`[Auto-Cron] Found ${toPost.length} scheduled posts for today at ${postingTime}. Firing sequential matrix with breathers...`);
-               
-               // Spin up a background sequential queue processor!
-               (async () => {
-                   for (let i = 0; i < toPost.length; i++) {
-                       const postDay = toPost[i];
-                       try {
-                           console.log(`[Auto-Cron] Delivering post ${i+1}/${toPost.length} to Blotato... (Day ID: ${postDay.id})`);
-                           const cleanUrl = publicTunnelUrl.endsWith('/') ? publicTunnelUrl.slice(0, -1) : publicTunnelUrl;
-                           const mappedImage = postDay.generatedImageUrl?.startsWith('/') ? `${cleanUrl}${postDay.generatedImageUrl}` : postDay.generatedImageUrl;
-                           let mappedVideo = postDay.generatedVideoUrl?.startsWith('/') ? `${cleanUrl}${postDay.generatedVideoUrl}` : postDay.generatedVideoUrl;
+        // Reset triggered slots at midnight
+        if (currentHHMM === '00:00') triggeredSlots.clear();
 
-                           // Handle Google Drive / Remote override dynamically during auto-posting too!
-                           if (postDay.customMediaUrl) {
-                               mappedVideo = postDay.customMediaUrl;
-                           }
+        const slots = getPostingSlots();
+        const slotIndex = slots.indexOf(currentHHMM);
+        if (slotIndex === -1 || triggeredSlots.has(currentHHMM)) return;
 
-                           const res = await fetch('/api/blotato/publish', {
-                               method: 'POST',
-                               headers: { 'Content-Type': 'application/json' },
-                               body: JSON.stringify({
-                                   image: postDay.customMediaUrl ? undefined : mappedImage,
-                                   video: mappedVideo,
-                                   onScreenText: postDay.onScreenText,
-                                   caption: postDay.caption,
-                                   hashtags: postDay.hashtags,
-                                   contentType: postDay.contentType,
-                                   blotatoApiKey,
-                                   dayId: postDay.id
-                               })
-                           });
-                           if (res.ok) {
-                               updateDay(postDay.id, { status: 'published' });
-                               console.log(`[Auto-Cron] Successfully locked post ${i+1} as Published.`);
-                           } else {
-                               console.error(`[Auto-Cron] Blotato explicitly rejected post ${i+1}`);
-                           }
-                       } catch (e) {
-                           console.error(`[Auto-Cron] Critical network failure for post ${i+1}`, e);
-                       }
-                       
-                       // Inject breather space between sequential posts to avoid API flood
-                       if (i < toPost.length - 1) {
-                           console.log("[Auto-Cron] Inducing 2-minute API breather before next delivery...");
-                           await new Promise(r => setTimeout(r, 120000));
-                       }
+        triggeredSlots.add(currentHHMM);
+        const toPost = days.filter(d => d.date === todayStr && d.isGoodToPost && d.status !== 'published');
+
+        if (toPost.length > 0) {
+           // Pick the next unpublished post for this time slot
+           const postDay = toPost[0];
+           console.log(`[Auto-Cron] Slot ${currentHHMM} (${slotIndex + 1}/${slots.length}) — publishing "${postDay.theme}" (${toPost.length} remaining today)`);
+
+           (async () => {
+               try {
+                   const cleanUrl = publicTunnelUrl.endsWith('/') ? publicTunnelUrl.slice(0, -1) : publicTunnelUrl;
+                   const mapUrl = (u?: string) => u?.startsWith('/') ? `${cleanUrl}${u}` : u;
+
+                   const customUrl = postDay.customMediaUrl ? formatGoogleDriveUrl(postDay.customMediaUrl) : undefined;
+                   const finalVideo = customUrl || mapUrl(postDay.generatedVideoUrl);
+                   const finalImage = mapUrl(postDay.generatedImageUrl);
+                   const isVideo = !!(finalVideo && (postDay.contentType === 'Video' || postDay.generatedVideoUrl || postDay.customMediaUrl));
+
+                   const res = await fetch('/api/blotato/publish', {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({
+                           image: isVideo ? undefined : finalImage,
+                           video: isVideo ? finalVideo : undefined,
+                           onScreenText: postDay.onScreenText,
+                           caption: postDay.caption,
+                           hashtags: postDay.hashtags,
+                           contentType: isVideo ? 'Video' : postDay.contentType,
+                           blotatoApiKey,
+                           dayId: postDay.id
+                       })
+                   });
+                   if (res.ok) {
+                       updateDay(postDay.id, { status: 'published' });
+                       console.log(`[Auto-Cron] Published successfully at slot ${currentHHMM}.`);
+                   } else {
+                       console.error(`[Auto-Cron] Blotato rejected post at slot ${currentHHMM}`);
                    }
-                   console.log("[Auto-Cron] Daily Publishing matrix complete!");
-               })();
-           }
+               } catch (e) {
+                   console.error(`[Auto-Cron] Network failure at slot ${currentHHMM}`, e);
+               }
+           })();
         }
     }, 30000); // Check every 30 seconds
 
     return () => clearInterval(interval);
-  }, [postingMode, postingTime, blotatoApiKey, days, publicTunnelUrl]);
+  }, [postingMode, postingTime, postingEndTime, postsPerDay, blotatoApiKey, days, publicTunnelUrl]);
 
   const selectedPersona = personas.find(p => p.id === selectedPersonaId) || personas[0];
   const personaDays = days
@@ -1677,18 +1685,25 @@ export default function App() {
                   </div>
                 </button>
                 
-                <button 
-                  onClick={() => {
-                    // Mock Drive Selection
-                    const mockDriveImages = [
-                      'https://picsum.photos/seed/drive1/800/1200',
-                      'https://picsum.photos/seed/drive2/800/1200',
-                      'https://picsum.photos/seed/drive3/800/1200'
-                    ];
-                    const randomDriveImage = mockDriveImages[Math.floor(Math.random() * mockDriveImages.length)];
-                    updateDay(selectedDay.id, { generatedImageUrl: randomDriveImage, status: 'completed' });
+                <button
+                  onClick={async () => {
+                    if (driveFiles.length === 0) {
+                      // Auto-sync if not loaded yet
+                      const url = localStorage.getItem('drive_folder_url');
+                      if (!url) return alert('Set your Google Drive folder URL in Settings first!');
+                      try {
+                        const res = await fetch('/api/drive/list', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ folderUrl: url })
+                        });
+                        if (!res.ok) throw new Error(await res.text());
+                        const data = await res.json();
+                        setDriveFiles(data.files || []);
+                      } catch (e: any) { return alert(`Failed to load Drive files: ${e.message}`); }
+                    }
                     setShowGenerationChoice(false);
-                    alert("Asset selected from Google Drive!");
+                    setShowDrivePicker(true);
                   }}
                   className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-transparent bg-zinc-50 hover:bg-zinc-100 hover:border-black transition-all group"
                 >
@@ -1697,9 +1712,109 @@ export default function App() {
                   </div>
                   <div className="text-left">
                     <div className="font-bold text-sm">Google Drive</div>
-                    <div className="text-[10px] text-zinc-500">Pick an existing asset from your Google Drive</div>
+                    <div className="text-[10px] text-zinc-500">Pick from {driveFiles.length || 'synced'} files in your Drive folder</div>
                   </div>
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Google Drive File Picker Modal */}
+        {showDrivePicker && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[80vh] flex flex-col"
+            >
+              <div className="p-5 border-b border-zinc-100 flex justify-between items-center flex-shrink-0">
+                <div>
+                  <h3 className="text-lg font-bold">Pick from Google Drive</h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">{driveFiles.length} files available -- click to select</p>
+                </div>
+                <button onClick={() => setShowDrivePicker(false)} className="text-zinc-400 hover:text-black">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="p-4 flex gap-2 border-b border-zinc-50 flex-shrink-0">
+                <button
+                  onClick={() => setDriveFiles(prev => [...prev].sort((a, b) => a.name.localeCompare(b.name)))}
+                  className="text-[10px] px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-600 font-bold hover:bg-zinc-200"
+                >All ({driveFiles.length})</button>
+                <button
+                  onClick={() => {}}
+                  className="text-[10px] px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 font-bold"
+                >Videos ({driveFiles.filter(f => f.contentType === 'Video').length})</button>
+                <button
+                  onClick={() => {}}
+                  className="text-[10px] px-2.5 py-1 rounded-full bg-green-50 text-green-600 font-bold"
+                >Images ({driveFiles.filter(f => f.contentType === 'Photo').length})</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {driveFiles.map((file: any) => (
+                    <button
+                      key={file.id}
+                      onClick={() => {
+                        const isVideo = file.contentType === 'Video' || file.mimeType?.startsWith('video/');
+                        const driveUrl = file.driveUrl || `https://drive.google.com/uc?export=download&id=${file.id}`;
+                        if (isVideo) {
+                          updateDay(selectedDay.id, {
+                            generatedVideoUrl: driveUrl,
+                            customMediaUrl: driveUrl,
+                            contentType: 'Video',
+                            status: 'completed'
+                          });
+                        } else {
+                          updateDay(selectedDay.id, {
+                            generatedImageUrl: driveUrl,
+                            customMediaUrl: driveUrl,
+                            status: 'completed'
+                          });
+                        }
+                        // Mark asset as queued in DB
+                        fetch(`/api/drive/assets/${file.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ status: 'queued', linkedDayId: selectedDay.id })
+                        }).catch(() => {});
+                        setShowDrivePicker(false);
+                      }}
+                      className="group relative aspect-square rounded-xl overflow-hidden border-2 border-zinc-100 hover:border-black transition-all bg-zinc-100"
+                    >
+                      {file.thumbnailLink ? (
+                        <img
+                          src={file.thumbnailLink}
+                          alt={file.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          {file.contentType === 'Video' ? <Video className="w-8 h-8 text-zinc-300" /> : <ImageIcon className="w-8 h-8 text-zinc-300" />}
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                        <div className="text-[9px] text-white font-bold truncate">{file.name}</div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${file.contentType === 'Video' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'}`}>
+                            {file.contentType === 'Video' ? 'VIDEO' : 'IMAGE'}
+                          </span>
+                          {file.size && <span className="text-[8px] text-white/70">{(parseInt(file.size) / 1024 / 1024).toFixed(1)}MB</span>}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {driveFiles.length === 0 && (
+                  <div className="text-center py-12 text-zinc-400">
+                    <Globe className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm font-medium">No files synced yet</p>
+                    <p className="text-xs mt-1">Add your Google Drive folder URL in Settings and click Sync</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
@@ -1898,8 +2013,9 @@ export default function App() {
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center text-xs font-bold text-zinc-500">
-                    D{day.dayNumber}
+                  <div className="w-10 h-10 rounded-lg bg-zinc-100 flex flex-col items-center justify-center text-zinc-500">
+                    <span className="text-[10px] font-bold leading-none">{new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</span>
+                    <span className="text-sm font-black leading-tight">{new Date(day.date + 'T00:00:00').getDate()}</span>
                   </div>
                   <div>
                     <div className="font-semibold text-sm truncate max-w-[100px]">{day.theme}</div>
@@ -2033,37 +2149,138 @@ export default function App() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label htmlFor="postingMode" className="block text-xs font-semibold text-zinc-500 mb-1">Publishing Mode</label>
-                          <select 
-                            id="postingMode"
-                            name="postingMode"
-                            value={postingMode}
-                            onChange={(e) => setPostingMode(e.target.value as any)}
-                            className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-medium cursor-pointer"
-                          >
-                            <option value="manual">Manual (via Button)</option>
-                            <option value="auto">Auto-schedule Daily</option>
-                          </select>
+                      <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-4">
+                        <h4 className="text-xs font-bold text-zinc-700 uppercase tracking-wider">Publishing Schedule</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label htmlFor="postingMode" className="block text-xs font-semibold text-zinc-500 mb-1">Publishing Mode</label>
+                            <select
+                              id="postingMode"
+                              name="postingMode"
+                              value={postingMode}
+                              onChange={(e) => setPostingMode(e.target.value as any)}
+                              className="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm font-medium cursor-pointer"
+                            >
+                              <option value="manual">Manual (via Button)</option>
+                              <option value="auto">Auto-schedule Daily</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label htmlFor="postsPerDaySetting" className="block text-xs font-semibold text-zinc-500 mb-1">Posts Per Day</label>
+                            <input
+                              id="postsPerDaySetting"
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={postsPerDay}
+                              onChange={(e) => setPostsPerDay(parseInt(e.target.value) || 1)}
+                              disabled={postingMode === 'manual'}
+                              className="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono disabled:opacity-50"
+                            />
+                          </div>
                         </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label htmlFor="postingTime" className="block text-xs font-semibold text-zinc-500 mb-1">First Post Time</label>
+                            <input
+                              id="postingTime"
+                              name="postingTime"
+                              type="time"
+                              value={postingTime}
+                              onChange={(e) => setPostingTime(e.target.value)}
+                              disabled={postingMode === 'manual'}
+                              className="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono disabled:opacity-50"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label htmlFor="postingEndTime" className="block text-xs font-semibold text-zinc-500 mb-1">Last Post Time</label>
+                            <input
+                              id="postingEndTime"
+                              name="postingEndTime"
+                              type="time"
+                              value={postingEndTime}
+                              onChange={(e) => setPostingEndTime(e.target.value)}
+                              disabled={postingMode === 'manual'}
+                              className="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono disabled:opacity-50"
+                            />
+                          </div>
+                        </div>
+                        {postingMode === 'auto' && postsPerDay > 1 && (
+                          <div className="text-[10px] text-zinc-400 font-medium bg-white rounded-lg px-3 py-2 border border-zinc-100">
+                            Posting slots: {(() => {
+                              const [sh, sm] = postingTime.split(':').map(Number);
+                              const [eh, em] = postingEndTime.split(':').map(Number);
+                              const startMin = sh * 60 + sm;
+                              const endMin = eh * 60 + em;
+                              const gap = postsPerDay > 1 ? Math.floor((endMin - startMin) / (postsPerDay - 1)) : 0;
+                              return Array.from({ length: postsPerDay }, (_, i) => {
+                                const mins = Math.min(startMin + gap * i, endMin);
+                                const h = Math.floor(mins / 60).toString().padStart(2, '0');
+                                const m = (mins % 60).toString().padStart(2, '0');
+                                return `${h}:${m}`;
+                              }).join(', ');
+                            })()}
+                          </div>
+                        )}
+                        {postsPerDay > 5 && (
+                          <p className="text-[10px] text-amber-600 font-semibold">Instagram recommends 3-5 posts/day for best engagement.</p>
+                        )}
+                      </div>
+
+                      <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-4">
+                        <h4 className="text-xs font-bold text-zinc-700 uppercase tracking-wider">Google Drive Media Library</h4>
                         <div className="space-y-1">
-                          <label htmlFor="postingTime" className="block text-xs font-semibold text-zinc-500 mb-1">Daily Post Time</label>
-                          <input 
-                            id="postingTime"
-                            name="postingTime"
-                            type="time"
-                            value={postingTime}
-                            onChange={(e) => setPostingTime(e.target.value)}
-                            disabled={postingMode === 'manual'}
-                            className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono disabled:opacity-50"
+                          <label className="block text-xs font-semibold text-zinc-500 mb-1">Shared Folder URL</label>
+                          <input
+                            type="text"
+                            value={driveFolderUrl}
+                            onChange={(e) => setDriveFolderUrl(e.target.value)}
+                            className="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono"
+                            placeholder="https://drive.google.com/drive/folders/FOLDER_ID"
                           />
+                          <p className="text-[10px] text-zinc-400 mt-1">Paste your shared Google Drive folder URL. Files will be available for direct posting.</p>
                         </div>
+                        <button
+                          onClick={async () => {
+                            if (!driveFolderUrl) return alert('Enter a Google Drive folder URL first');
+                            setIsDriveSyncing(true);
+                            try {
+                              const res = await fetch('/api/drive/list', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ folderUrl: driveFolderUrl })
+                              });
+                              if (!res.ok) throw new Error(await res.text());
+                              const data = await res.json();
+                              setDriveFiles(data.files || []);
+                              alert(`Synced ${data.files?.length || 0} files from Google Drive!`);
+                            } catch (e: any) { alert(`Drive sync failed: ${e.message}`); }
+                            finally { setIsDriveSyncing(false); }
+                          }}
+                          disabled={isDriveSyncing}
+                          className="w-full bg-zinc-800 text-white py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+                        >
+                          {isDriveSyncing ? 'Syncing...' : `Sync Files from Drive (${driveFiles.length} loaded)`}
+                        </button>
+                        {driveFiles.length > 0 && (
+                          <div className="max-h-40 overflow-y-auto space-y-1">
+                            {driveFiles.map((f: any) => (
+                              <div key={f.id} className="flex items-center gap-2 text-xs p-1.5 bg-white rounded-lg border border-zinc-100">
+                                {f.thumbnailLink && <img src={f.thumbnailLink} className="w-8 h-8 rounded object-cover" referrerPolicy="no-referrer" />}
+                                <div className="flex-1 truncate">
+                                  <div className="font-medium truncate">{f.name}</div>
+                                  <div className="text-[10px] text-zinc-400">{f.mimeType?.includes('video') ? 'Video' : 'Image'}</div>
+                                </div>
+                                <span className="text-[10px] text-zinc-400">{f.size ? (parseInt(f.size) / 1024 / 1024).toFixed(1) + ' MB' : ''}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-1">
                         <label htmlFor="publicTunnelUrl" className="block text-xs font-semibold text-zinc-500 mb-1">Public Tunnel URL (Ngrok)</label>
-                        <input 
+                        <input
                           id="publicTunnelUrl"
                           name="publicTunnelUrl"
                           type="text"
@@ -2084,9 +2301,12 @@ export default function App() {
                            localStorage.setItem('kling_variant', klingVariant); 
                            localStorage.setItem('n8n_webhook_url', n8nWebhookUrl); 
                            localStorage.setItem('blotato_api_key', blotatoApiKey); 
-                           localStorage.setItem('posting_mode', postingMode); 
-                           localStorage.setItem('posting_time', postingTime); 
-                           localStorage.setItem('public_tunnel_url', publicTunnelUrl); 
+                           localStorage.setItem('posting_mode', postingMode);
+                           localStorage.setItem('posting_time', postingTime);
+                           localStorage.setItem('posting_end_time', postingEndTime);
+                           localStorage.setItem('posts_per_day', postsPerDay.toString());
+                           localStorage.setItem('drive_folder_url', driveFolderUrl);
+                           localStorage.setItem('public_tunnel_url', publicTunnelUrl);
                            alert('Settings Saved!'); 
                            setActivePage('dashboard'); 
                         }}
@@ -2186,12 +2406,7 @@ export default function App() {
                 <div className="flex gap-3">
                   <button 
                     onClick={() => {
-
-                      if (selectedDay.generatedImageUrl) {
-                        generateContent();
-                      } else {
-                        setShowGenerationChoice(true);
-                      }
+                      setShowGenerationChoice(true);
                     }}
                     disabled={isGenerating}
                     className="flex items-center gap-2 bg-black text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-zinc-800 transition-all shadow-md disabled:opacity-50"
@@ -2379,10 +2594,18 @@ export default function App() {
                              />
                              <button
                                onClick={() => {
-                                 const f = formatGoogleDriveUrl(selectedDay.customMediaUrl || '');
-                                 if (f) updateDay(selectedDay.id, { generatedImageUrl: f, customMediaUrl: f, status: 'completed' });
+                                 const raw = selectedDay.customMediaUrl || '';
+                                 if (!raw) return;
+                                 const f = formatGoogleDriveUrl(raw);
+                                 const ext = raw.split('?')[0].toLowerCase();
+                                 const isVid = ext.endsWith('.mp4') || ext.endsWith('.mov') || ext.endsWith('.webm') || ext.endsWith('.avi');
+                                 if (isVid) {
+                                   updateDay(selectedDay.id, { generatedVideoUrl: f, customMediaUrl: f, contentType: 'Video', status: 'completed' });
+                                 } else {
+                                   updateDay(selectedDay.id, { generatedImageUrl: f, customMediaUrl: f, status: 'completed' });
+                                 }
                                }}
-                               className="bg-zinc-800 text-white px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap whitespace-nowrap"
+                               className="bg-zinc-800 text-white px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap"
                              >Apply Link</button>
                           </div>
                       </div>
@@ -2590,11 +2813,16 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                        ) : selectedDay.generatedImageUrl ? (
+                        ) : (selectedDay.generatedImageUrl || selectedDay.generatedVideoUrl || selectedDay.customMediaUrl) ? (
                           (() => {
                             const slides: { type: 'image' | 'video', url: string }[] = [];
                             if (selectedDay.generatedImageUrl) slides.push({ type: 'image', url: selectedDay.generatedImageUrl });
                             if (selectedDay.generatedVideoUrl) slides.push({ type: 'video', url: selectedDay.generatedVideoUrl });
+                            if (selectedDay.customMediaUrl && !selectedDay.generatedVideoUrl) {
+                              const ext = selectedDay.customMediaUrl.split('?')[0].toLowerCase();
+                              const isVid = ext.endsWith('.mp4') || ext.endsWith('.mov') || ext.endsWith('.webm') || selectedDay.contentType === 'Video';
+                              slides.push({ type: isVid ? 'video' : 'image', url: formatGoogleDriveUrl(selectedDay.customMediaUrl) });
+                            }
                             const curIdx = previewSlideIndex[selectedDay.id] || 0;
                             const cur = slides[curIdx];
                             const vStatus = videoStatus[selectedDay.id];
@@ -2621,12 +2849,16 @@ export default function App() {
                                   />
                                 )}
 
-                                {/* Text overlay (image only) */}
-                                {cur.type === 'image' && (
-                                  <div className="absolute inset-x-4 bottom-12 flex justify-center pointer-events-none">
-                                    <p className="bg-black/40 backdrop-blur-md text-white text-center text-xs font-bold px-3 py-2 rounded-xl max-w-[75%] shadow-md">
-                                      {selectedDay.onScreenText || selectedDay.theme}
-                                    </p>
+                                {/* Text overlay preview (matches server-side canvas burn) */}
+                                {cur.type === 'image' && selectedDay.onScreenText && (
+                                  <div className="absolute inset-x-0 bottom-[12%] flex justify-center pointer-events-none">
+                                    <div className="w-[75%] rounded-2xl px-[1.5em] py-[1em] text-center"
+                                         style={{ backgroundColor: 'rgba(70, 60, 50, 0.85)' }}>
+                                      <p className="text-white font-bold leading-[1.35] line-clamp-3"
+                                         style={{ fontSize: 'clamp(10px, 3.8vw, 18px)' }}>
+                                        {selectedDay.onScreenText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()}
+                                      </p>
+                                    </div>
                                   </div>
                                 )}
 
@@ -2711,20 +2943,25 @@ export default function App() {
 
                                    try {
                                       const cleanUrl = publicTunnelUrl.endsWith('/') ? publicTunnelUrl.slice(0, -1) : publicTunnelUrl;
-                                      const mappedImage = selectedDay.generatedImageUrl?.startsWith('/') ? `${cleanUrl}${selectedDay.generatedImageUrl}` : selectedDay.generatedImageUrl;
-                                      const mappedVideo = selectedDay.generatedVideoUrl?.startsWith('/') ? `${cleanUrl}${selectedDay.generatedVideoUrl}` : selectedDay.generatedVideoUrl;
+                                      const mapUrl = (u?: string) => u?.startsWith('/') ? `${cleanUrl}${u}` : u;
+
+                                      // Resolve final media: customMediaUrl overrides, video takes priority over image
+                                      const customUrl = selectedDay.customMediaUrl ? formatGoogleDriveUrl(selectedDay.customMediaUrl) : undefined;
+                                      const finalVideo = customUrl || mapUrl(selectedDay.generatedVideoUrl);
+                                      const finalImage = finalVideo ? undefined : mapUrl(selectedDay.generatedImageUrl);
+                                      const isVideo = !!(finalVideo && (selectedDay.contentType === 'Video' || selectedDay.generatedVideoUrl || selectedDay.customMediaUrl));
 
                                       // Tell Blotato to post
                                       const res = await fetch('/api/blotato/publish', {
                                          method: 'POST',
                                          headers: { 'Content-Type': 'application/json' },
                                          body: JSON.stringify({
-                                            image: mappedImage,
-                                            video: mappedVideo,
+                                            image: isVideo ? undefined : (finalImage || mapUrl(selectedDay.generatedImageUrl)),
+                                            video: isVideo ? finalVideo : undefined,
                                             caption: selectedDay.caption,
                                             hashtags: selectedDay.hashtags,
                                             onScreenText: selectedDay.onScreenText,
-                                            contentType: selectedDay.contentType,
+                                            contentType: isVideo ? 'Video' : selectedDay.contentType,
                                             blotatoApiKey,
                                             dayId: selectedDay.id
                                          })
