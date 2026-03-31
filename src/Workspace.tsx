@@ -7,7 +7,7 @@ import {
   MessageSquare, Palette, Scissors, BookOpen, UserCircle, Globe,
   Save, AlertCircle, Clock, Copy, ExternalLink, FolderOpen, Key,
   Zap, MousePointerClick, Camera, Shirt, Type, LayoutGrid, Users, Target, AtSign, UserPlus,
-  Lock, User, RefreshCw,
+  Lock, User, RefreshCw, GripVertical,
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useAuth } from './contexts/AuthContext';
@@ -1480,18 +1480,53 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
               No content days yet. Click "New Post" to start.
             </div>
           ) : (
-            personaDays.map(day => {
+            personaDays.map((day, idx) => {
               const { month, day: dayNum } = formatDate(day.date);
               const isPublished = day.status === 'published';
               return (
                 <div
                   key={day.id}
+                  draggable={!isPublished}
+                  onDragStart={e => {
+                    e.dataTransfer.setData('text/plain', day.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                    (e.currentTarget as HTMLElement).style.opacity = '0.4';
+                  }}
+                  onDragEnd={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+                  onDragOver={e => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    (e.currentTarget as HTMLElement).style.borderTop = '2px solid #f43f5e';
+                  }}
+                  onDragLeave={e => { (e.currentTarget as HTMLElement).style.borderTop = ''; }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLElement).style.borderTop = '';
+                    const draggedId = e.dataTransfer.getData('text/plain');
+                    if (!draggedId || draggedId === day.id) return;
+                    // Swap dates between dragged and drop target
+                    const draggedDay = personaDays.find(d => d.id === draggedId);
+                    if (draggedDay && draggedDay.status !== 'published') {
+                      const tempDate = draggedDay.date;
+                      handleUpdateDayDate(draggedId, day.date);
+                      handleUpdateDayDate(day.id, tempDate);
+                    }
+                  }}
                   className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-gray-800/50 cursor-pointer group/sidebar',
+                    'w-full flex items-center gap-2 px-2 py-2.5 text-left transition-colors border-b border-gray-800/50 group/sidebar cursor-pointer',
                     day.id === selectedDayId ? 'bg-white/5 border-l-2 border-l-white' : 'hover:bg-gray-800/50'
                   )}
                   onClick={() => selectDay(day.id)}
                 >
+                  {/* Drag handle — only for non-published, visible on hover */}
+                  {!isPublished ? (
+                    <div className="w-4 flex-shrink-0 flex items-center justify-center opacity-0 group-hover/sidebar:opacity-60 cursor-grab active:cursor-grabbing transition-opacity">
+                      <GripVertical className="w-3.5 h-3.5 text-gray-500" />
+                    </div>
+                  ) : (
+                    <div className="w-4 flex-shrink-0" />
+                  )}
+
                   {/* Date box */}
                   <div className="w-10 h-10 rounded-lg bg-gray-800 flex flex-col items-center justify-center flex-shrink-0">
                     <span className="text-[9px] font-bold text-gray-400 leading-none">{month}</span>
@@ -1506,27 +1541,20 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                         {day.status}
                       </span>
                       {isPublished && <Lock className="w-3 h-3 text-rose-400" />}
+                      {/* Content type icon */}
+                      {day.contentType === 'Photo' && <Image className="w-3 h-3 text-gray-500" />}
+                      {day.contentType === 'Video' && <Video className="w-3 h-3 text-gray-500" />}
+                      {day.contentType === 'Carousel' && <LayoutGrid className="w-3 h-3 text-gray-500" />}
                       <span className="text-[10px] text-gray-500">
                         {day.platforms.map(p => PLATFORM_LETTERS[p]).join('/')}
                       </span>
                     </div>
                   </div>
 
-                  {/* Duplicate button for published posts (shown on hover) */}
-                  {isPublished && (
-                    <button
-                      onClick={e => { e.stopPropagation(); handleDuplicateDay(day.id); }}
-                      title="Duplicate post"
-                      className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-white opacity-0 group-hover/sidebar:opacity-100 transition-opacity flex-shrink-0"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-
                   {/* Image thumbnail */}
-                  {day.generatedImageUrl && (
+                  {(day.generatedImageUrl || day.customMediaUrl || day.thumbnailUrl) && (
                     <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
-                      <img src={day.generatedImageUrl} alt="" className="w-full h-full object-cover" />
+                      <img src={day.thumbnailUrl || day.customMediaUrl || day.generatedImageUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </div>
                   )}
                 </div>
@@ -2079,18 +2107,22 @@ function PostCard({
 
         {/* Date header row */}
         <div className="flex items-center gap-3 mb-4">
-          <span className="text-sm text-gray-400">Day {day.dayNumber}</span>
-          <span className="text-sm text-gray-600">|</span>
-          <span className="text-sm text-gray-400">{dateDisplay}</span>
-          {!isPublished && (
-            <input
-              type="date"
-              value={day.date}
-              onChange={e => onUpdateField('date', e.target.value)}
-              className="bg-transparent text-xs text-gray-500 border-none outline-none cursor-pointer w-[20px] opacity-0 hover:opacity-100 transition-opacity"
-              title="Change date"
-            />
+          {!isPublished ? (
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <Calendar className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors" />
+              <input
+                type="date"
+                value={day.date}
+                onChange={e => onUpdateField('date', e.target.value)}
+                className="bg-transparent text-sm text-gray-300 border-none outline-none cursor-pointer hover:text-white transition-colors"
+              />
+            </label>
+          ) : (
+            <span className="text-sm text-gray-400 flex items-center gap-2">
+              <Lock className="w-3.5 h-3.5" /> {dateDisplay}
+            </span>
           )}
+          <span className="text-xs text-gray-600 bg-gray-800 px-2 py-0.5 rounded">#{day.dayNumber}</span>
         </div>
 
         {/* Two-column layout: stack on mobile (image first), side-by-side on desktop */}

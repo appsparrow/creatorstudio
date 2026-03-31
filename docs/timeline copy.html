@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Creator Studio — Build Story</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#09090b;--surface:#18181b;--border:#27272a;--text:#fafafa;--muted:#a1a1aa;--rose:#f43f5e;--rose-dim:rgba(244,63,94,.15);--max-w:1100px}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif}
+a{color:var(--rose);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:var(--max-w);margin:0 auto;padding:0 24px}
+section{padding:80px 0}
+@media(max-width:640px){section{padding:48px 0}}
+
+/* Fade-in */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+
+/* ---- HERO ---- */
+.hero{min-height:80vh;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 30%,rgba(244,63,94,.08),transparent 70%)}
+.hero-inner{position:relative;z-index:1}
+.hero h1{font-size:clamp(3rem,8vw,5.5rem);font-weight:700;letter-spacing:-2px;line-height:1.05}
+.hero h1 span{background:linear-gradient(135deg,var(--rose),#fb7185);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero .tagline{font-size:clamp(1rem,2.5vw,1.35rem);color:var(--muted);margin:20px auto 0;max-width:580px}
+.hero .byline{margin-top:32px;font-size:.85rem;color:var(--muted);letter-spacing:.5px}
+.hero .byline strong{color:var(--text);font-weight:500}
+
+/* ---- PROBLEM ---- */
+.section-label{text-align:center;margin-bottom:48px}
+.section-label h2{font-size:clamp(1.8rem,4vw,2.5rem);font-weight:700;letter-spacing:-1px}
+.section-label p{color:var(--muted);margin-top:8px;font-size:1rem}
+.pain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+@media(max-width:768px){.pain-grid{grid-template-columns:1fr}}
+.pain-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 24px;text-align:center}
+.pain-card .icon{font-size:2rem;margin-bottom:12px}
+.pain-card h3{font-size:1.1rem;font-weight:600;margin-bottom:8px}
+.pain-card p{font-size:.9rem;color:var(--muted);line-height:1.5}
+
+/* ---- TIMELINE ---- */
+.timeline{position:relative;padding:0 0 0 0}
+.timeline::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--border);transform:translateX(-50%)}
+@media(max-width:768px){.timeline::before{left:20px}}
+.tl-entry{position:relative;width:50%;padding:0 48px 64px}
+.tl-entry:nth-child(odd){left:0;text-align:right}
+.tl-entry:nth-child(even){left:50%;text-align:left}
+@media(max-width:768px){.tl-entry,.tl-entry:nth-child(odd),.tl-entry:nth-child(even){width:100%;left:0;text-align:left;padding:0 0 48px 52px}}
+/* Dot */
+.tl-entry::before{content:'';position:absolute;width:14px;height:14px;background:var(--rose);border-radius:50%;top:6px;z-index:2;box-shadow:0 0 0 4px var(--bg),0 0 12px rgba(244,63,94,.4)}
+.tl-entry:nth-child(odd)::before{right:-7px}
+.tl-entry:nth-child(even)::before{left:-7px}
+@media(max-width:768px){.tl-entry::before,.tl-entry:nth-child(odd)::before,.tl-entry:nth-child(even)::before{left:14px;right:auto}}
+.tl-pill{display:inline-block;background:var(--rose-dim);color:var(--rose);font-size:.75rem;font-weight:600;padding:4px 14px;border-radius:999px;margin-bottom:10px;letter-spacing:.5px;text-transform:uppercase}
+.tl-entry h3{font-size:1.2rem;font-weight:700;margin-bottom:8px;letter-spacing:-.3px}
+.tl-entry .desc{font-size:.92rem;color:var(--muted);line-height:1.6;margin-bottom:12px}
+.tl-insight{border-left:3px solid var(--rose);padding:8px 16px;font-style:italic;font-size:.9rem;color:#d4d4d8;margin-bottom:12px;background:rgba(244,63,94,.04);border-radius:0 6px 6px 0;text-align:left}
+.tl-stat{display:inline-block;background:var(--surface);border:1px solid var(--border);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.85rem;padding:4px 14px;border-radius:8px;color:var(--rose)}
+
+/* ---- FEATURES ---- */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:900px){.feat-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
+.feat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px}
+.feat-card .icon{font-size:1.6rem;margin-bottom:8px}
+.feat-card h4{font-size:1rem;font-weight:600;margin-bottom:10px}
+.feat-card ul{list-style:none;padding:0}
+.feat-card li{font-size:.82rem;color:var(--muted);padding:3px 0;position:relative;padding-left:14px}
+.feat-card li::before{content:'';position:absolute;left:0;top:10px;width:5px;height:5px;border-radius:50%;background:var(--border)}
+
+/* ---- STATS ---- */
+.stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;text-align:center}
+@media(max-width:768px){.stats-row{grid-template-columns:repeat(3,1fr);gap:24px 16px}}
+@media(max-width:400px){.stats-row{grid-template-columns:repeat(2,1fr)}}
+.stat-item .num{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(2rem,5vw,3.2rem);color:var(--rose);line-height:1}
+.stat-item .lbl{font-size:.8rem;color:var(--muted);margin-top:6px;text-transform:uppercase;letter-spacing:1px}
+
+/* ---- ARCH ---- */
+.arch{display:flex;flex-direction:column;align-items:center;gap:12px}
+.arch-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.arch-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 22px;font-size:.85rem;font-weight:500;text-align:center;min-width:120px}
+.arch-box.primary{border-color:var(--rose);color:var(--rose)}
+.arch-arrow{color:var(--muted);font-size:1.2rem;display:flex;align-items:center;justify-content:center}
+
+/* ---- CLOSING ---- */
+.closing{text-align:center}
+.closing blockquote{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.1rem,3vw,1.6rem);font-weight:500;max-width:700px;margin:0 auto 32px;line-height:1.4;letter-spacing:-.3px;position:relative;padding:0 24px}
+.closing blockquote::before,.closing blockquote::after{content:'"';color:var(--rose);font-size:2rem;line-height:1;vertical-align:top}
+.closing blockquote::after{content:'"'}
+.closing .cta{font-size:1rem;margin-bottom:48px}
+.closing .cta a{font-weight:600}
+footer{text-align:center;padding:32px 24px;font-size:.78rem;color:#52525b;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+<div class="hero-inner reveal">
+<h1><span>Creator Studio</span></h1>
+<p class="tagline">How one person built the AI influencer content platform in 2 weeks</p>
+<p class="byline">By <strong>Siva Tayi</strong> &middot; March 2026 &middot; Built with Claude Code</p>
+</div>
+</section>
+
+<!-- PROBLEM -->
+<section>
+<div class="wrap">
+<div class="section-label reveal">
+<h2>The Problem</h2>
+<p>Three pain points every AI content creator knows too well</p>
+</div>
+<div class="pain-grid">
+<div class="pain-card reveal">
+<div class="icon">🪞</div>
+<h3>The Consistency Crisis</h3>
+<p>AI-generated faces change between every post. Your "influencer" looks like a different person every time.</p>
+</div>
+<div class="pain-card reveal">
+<div class="icon">🧩</div>
+<h3>The 6-Tool Nightmare</h3>
+<p>ChatGPT + Midjourney + Kling + Canva + Later + Instagram. Six tools, six tabs, zero flow state.</p>
+</div>
+<div class="pain-card reveal">
+<div class="icon">📢</div>
+<h3>Content Without Purpose</h3>
+<p>No audience strategy, no pain-point targeting. Just pretty pictures shouting into the void.</p>
+</div>
+</div>
+</div>
+</section>
+
+<!-- TIMELINE -->
+<section>
+<div class="wrap">
+<div class="section-label reveal">
+<h2>The Build Timeline</h2>
+<p>13 days, from idea to production</p>
+</div>
+<div class="timeline">
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Days 1-3</span>
+<h3>Phase 1: The Prototype</h3>
+<p class="desc">Started with raw Express + SQLite + React. No auth, no cloud, no design system. Just a local app that could define a persona, generate images with NanoBanana and Gemini, create videos with Kling AI, and post to Instagram via Blotato.</p>
+<div class="tl-insight">"The tool shouldn't just generate content &mdash; it should understand WHO the content is for."</div>
+</div>
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Day 4</span>
+<h3>The Pivot</h3>
+<p class="desc">Threw away 3,144 lines of code. Not because it was broken &mdash; it worked great. But it was a monolith. One file. No auth. Local only. If this was going to be a real product, it needed real architecture.</p>
+<div class="tl-stat">3,144 lines deleted</div>
+</div>
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Days 4-5</span>
+<h3>Phase 2: New Architecture</h3>
+<p class="desc">Supabase PostgreSQL with Row Level Security. Cloudflare Workers (Hono) as the API layer. Cloudflare R2 for media storage. Multi-tenant from day one.</p>
+<div class="tl-stat">Zero egress fees</div>
+</div>
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Day 5</span>
+<h3>The Canvas Moment</h3>
+<p class="desc">Built a beautiful multi-page SaaS app with routing and navigation. Used it for 10 minutes and hated it. Too many clicks. Too much context switching. Rebuilt as a single-screen workspace.</p>
+<div class="tl-insight">"This should feel like a canvas, not an admin panel. Everything in one view. Click to edit, not click to navigate."</div>
+</div>
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Days 6-7</span>
+<h3>Phase 3: AI-First</h3>
+<p class="desc">The biggest design decision: AI fills everything, human tweaks. Describe what happens and the system generates theme, scene, caption, hashtags, CTA, hook, music suggestion, location, story arc, and caption tone.</p>
+<div class="tl-stat">80% less manual work</div>
+</div>
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Days 7-10</span>
+<h3>Phase 4: Audience Strategy</h3>
+<p class="desc">Every post now connects Persona (WHO), Target Audience (FOR WHOM), Content Focus (ABOUT WHAT), and Products (WITH WHAT). Up to 6 audience segments with pain points, aspirations, and resonance notes.</p>
+<div class="tl-insight">"Content without audience awareness is noise."</div>
+</div>
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Day 8</span>
+<h3>Friends &amp; Storylines</h3>
+<p class="desc">Recurring characters that appear in your persona's storyline. Each friend has a photo, traits, relationship, and an active/inactive toggle. Diversity rules enforced automatically.</p>
+<div class="tl-insight">"Your AI influencer's best friend should look the same in post 1 and post 100."</div>
+</div>
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Day 9</span>
+<h3>Content Types</h3>
+<p class="desc">Photo (scene + text overlay), Carousel (4+ slides with sequential storyline), Video (hook, thumbnail, camera angle, audio). One AI prompt generates content for all three types.</p>
+<div class="tl-stat">1 prompt &rarr; 3 formats</div>
+</div>
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Day 11</span>
+<h3>Deployed</h3>
+<p class="desc">Frontend on Cloudflare Pages, API on Cloudflare Workers, database on Supabase PostgreSQL, media on R2, auth on Supabase Auth. All media files migrated from local filesystem.</p>
+<div class="tl-stat">64 files migrated to R2</div>
+</div>
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Day 12</span>
+<h3>Thumbnail Generation</h3>
+<p class="desc">Upload reference thumbnails &mdash; the poses, expressions, and framing you want &mdash; and the AI generates click-worthy thumbnails in that style. Because the thumbnail determines whether anyone watches your video.</p>
+</div>
+
+<div class="tl-entry reveal">
+<span class="tl-pill">Day 13</span>
+<h3>Google Drive Integration</h3>
+<p class="desc">Per-persona Drive folders. Sync files, select images and videos for posts, mix Drive media with AI generation. For carousels: pick 2 from Drive, generate the other 2.</p>
+</div>
+
+</div><!-- /timeline -->
+</div>
+</section>
+
+<!-- FEATURES -->
+<section>
+<div class="wrap">
+<div class="section-label reveal">
+<h2>Feature Set</h2>
+<p>Everything that ships in one platform</p>
+</div>
+<div class="feat-grid">
+<div class="feat-card reveal">
+<div class="icon">🎭</div>
+<h4>Persona Management</h4>
+<ul>
+<li>Visual card editor, click-to-edit</li>
+<li>AI persona generation from description</li>
+<li>Reference images with primary selection</li>
+<li>Up to 6 recurring friends</li>
+<li>Social handles (IG, TikTok, YT, X)</li>
+</ul>
+</div>
+<div class="feat-card reveal">
+<div class="icon">🎯</div>
+<h4>Target Audience</h4>
+<ul>
+<li>6 audience segments per persona</li>
+<li>AI-generated audience suggestions</li>
+<li>Pain points and aspirations</li>
+<li>Content resonance notes</li>
+<li>Injected into every AI prompt</li>
+</ul>
+</div>
+<div class="feat-card reveal">
+<div class="icon">✍️</div>
+<h4>Content Creation</h4>
+<ul>
+<li>AI-first, prompt-driven flow</li>
+<li>Photo / Carousel / Video types</li>
+<li>Story arcs and caption tones</li>
+<li>All fields generated in one prompt</li>
+<li>Published posts locked + duplicatable</li>
+</ul>
+</div>
+<div class="feat-card reveal">
+<div class="icon">🖼️</div>
+<h4>Image Generation</h4>
+<ul>
+<li>NanoBanana + Gemini AI</li>
+<li>Persona consistency enforcement</li>
+<li>Text overlay (top/mid/bottom)</li>
+<li>Friends as named characters</li>
+<li>Diversity rules for supporting cast</li>
+</ul>
+</div>
+<div class="feat-card reveal">
+<div class="icon">🎬</div>
+<h4>Video Generation</h4>
+<ul>
+<li>Kling AI (v1 through v3)</li>
+<li>8 camera angle presets</li>
+<li>Thumbnail style references</li>
+<li>Hook-first (first 3 seconds)</li>
+<li>Async polling + webhook support</li>
+</ul>
+</div>
+<div class="feat-card reveal">
+<div class="icon">📅</div>
+<h4>Calendar &amp; Scheduling</h4>
+<ul>
+<li>Monthly grid with thumbnails</li>
+<li>Drag-and-drop rescheduling</li>
+<li>Published post locking</li>
+<li>Duplicate with "(Copy)" suffix</li>
+<li>Distributed time slot calculator</li>
+</ul>
+</div>
+<div class="feat-card reveal">
+<div class="icon">📁</div>
+<h4>Google Drive</h4>
+<ul>
+<li>Per-persona folder config</li>
+<li>File sync with thumbnails</li>
+<li>Picker modal (single/multi)</li>
+<li>Mix Drive + AI for carousels</li>
+<li>Photo, Carousel, Video support</li>
+</ul>
+</div>
+<div class="feat-card reveal">
+<div class="icon">📤</div>
+<h4>Publishing</h4>
+<ul>
+<li>Blotato API to Instagram</li>
+<li>Photos as posts, videos as Reels</li>
+<li>Hashtag limiting (5 for IG)</li>
+<li>Auto-scheduling with time slots</li>
+<li>Per-persona posting schedule</li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+
+<!-- STATS -->
+<section>
+<div class="wrap">
+<div class="section-label reveal">
+<h2>The Numbers</h2>
+</div>
+<div class="stats-row reveal">
+<div class="stat-item"><div class="num">50+</div><div class="lbl">Features</div></div>
+<div class="stat-item"><div class="num">8,400</div><div class="lbl">Lines of Code</div></div>
+<div class="stat-item"><div class="num">5</div><div class="lbl">AI Services</div></div>
+<div class="stat-item"><div class="num">1</div><div class="lbl">Builder</div></div>
+<div class="stat-item"><div class="num">~2</div><div class="lbl">Weeks</div></div>
+<div class="stat-item"><div class="num">$0</div><div class="lbl">Egress Fees</div></div>
+</div>
+</div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section>
+<div class="wrap">
+<div class="section-label reveal">
+<h2>Architecture</h2>
+</div>
+<div class="arch reveal">
+<div class="arch-row">
+<div class="arch-box primary">React (Cloudflare Pages)</div>
+</div>
+<div class="arch-arrow">&darr;</div>
+<div class="arch-row">
+<div class="arch-box primary">Hono API (Cloudflare Workers)</div>
+</div>
+<div class="arch-arrow">&darr;</div>
+<div class="arch-row">
+<div class="arch-box">Supabase (DB + Auth)</div>
+<div class="arch-box">R2 (Media Storage)</div>
+<div class="arch-box">AI Services</div>
+</div>
+<div class="arch-arrow">&darr;</div>
+<div class="arch-row">
+<div class="arch-box" style="font-size:.78rem">NanoBanana</div>
+<div class="arch-box" style="font-size:.78rem">Gemini</div>
+<div class="arch-box" style="font-size:.78rem">Kling AI</div>
+<div class="arch-box" style="font-size:.78rem">Blotato</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- CLOSING -->
+<section class="closing">
+<div class="wrap reveal">
+<blockquote>The future of content creation isn't more tools. It's ONE tool that understands your brand.</blockquote>
+<p class="cta">Follow the journey &rarr; <a href="https://twitter.com/sivatayi" target="_blank" rel="noopener">@sivatayi</a></p>
+</div>
+</section>
+
+<footer>Built by Siva Tayi with Claude Code &middot; March 2026</footer>
+
+<script>
+const obs=new IntersectionObserver((entries)=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target)}})},{threshold:0.12,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+</script>
+</body>
+</html>
