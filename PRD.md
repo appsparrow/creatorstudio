@@ -1,7 +1,7 @@
 # Creator Studio - Product Requirements Document (PRD)
 
-**Version:** 1.0
-**Date:** March 28, 2026
+**Version:** 2.0
+**Date:** March 30, 2026
 **Status:** Living Document
 
 ---
@@ -10,9 +10,9 @@
 
 ### 1.1 What is Creator Studio?
 
-Creator Studio is an AI-powered content creation and publishing platform designed for social media creators and brands. It enables users to create detailed virtual personas, plan content calendars, generate AI images and videos, and publish directly to social media platforms -- all from a single desktop application.
+Creator Studio is an AI-powered content creation and publishing platform for social media creators, brands, and agencies. It enables users to create detailed virtual influencer personas, define target audiences, plan content calendars, generate AI images and videos, and publish directly to social media platforms -- all from a single canvas-style workspace.
 
-The product streamlines the end-to-end content workflow: **Persona Creation -> Content Planning -> Asset Generation -> Review -> Publishing**.
+**Core workflow:** Persona Creation → Audience Definition → Content Planning → Asset Generation → Review → Publishing
 
 ### 1.2 Problem Statement
 
@@ -21,8 +21,7 @@ Social media content creation involves fragmented tools and manual processes:
 - Maintaining visual consistency across posts (same character, style, brand) is extremely difficult with AI tools
 - Content calendars live in spreadsheets disconnected from the assets they describe
 - Publishing requires manually downloading, uploading, and captioning across platforms
-
-Creator Studio solves this by unifying persona management, AI-driven content generation, and social publishing into one coherent workflow.
+- No tool connects persona identity → target audience → content strategy → generation → publishing in one flow
 
 ### 1.3 Target Users
 
@@ -36,10 +35,11 @@ Creator Studio solves this by unifying persona management, AI-driven content gen
 ### 1.4 Key Value Propositions
 
 1. **Persona-First Workflow** -- Define a character once; every generated image and video stays consistent
-2. **End-to-End Pipeline** -- From content idea to published post without leaving the app
-3. **Multi-Model AI** -- Choose between Gemini, NanoBanana, and Kling for different generation needs
-4. **Calendar-Driven Planning** -- Visual content calendar with drag-and-drop scheduling
-5. **One-Click Publishing** -- Direct posting to Instagram via Blotato integration
+2. **Audience-Aware Content** -- Content is generated with target audience pain points and aspirations baked in
+3. **AI-First Creation** -- Describe what you want; AI fills in all the details
+4. **End-to-End Pipeline** -- From content idea to published post without leaving the app
+5. **Canvas Workspace** -- Everything visible in one view, minimal navigation
+6. **Multi-Model AI** -- NanoBanana, Gemini, and Kling for different generation needs
 
 ---
 
@@ -47,338 +47,342 @@ Creator Studio solves this by unifying persona management, AI-driven content gen
 
 ### 2.1 Frontend
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **React** | 19.0.0 | UI framework |
-| **TypeScript** | 5.8.2 | Type-safe development |
-| **Vite** | 6.2.0 | Build tool with HMR |
-| **Tailwind CSS** | 4.1.14 | Utility-first styling |
-| **Motion** | 12.38.0 | UI animations |
-| **Lucide React** | 0.546.0 | Icon library |
+| Technology | Purpose |
+|------------|---------|
+| **React 19** + **TypeScript** | UI framework with type safety |
+| **Vite 6** | Build tool with HMR |
+| **Tailwind CSS 4** | Utility-first styling |
+| **Motion (Framer Motion)** | Animations and transitions |
+| **Lucide React** | Icon library |
+| **React Router DOM** | Deep-linking support (optional) |
 
-### 2.2 Backend
+### 2.2 Backend (Production)
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **Express.js** | 4.21.2 | API server |
-| **Node.js + tsx** | -- | TypeScript execution |
-| **better-sqlite3** | 12.8.0 | Local SQLite database |
-| **CORS** | 2.8.6 | Cross-origin support |
-| **dotenv** | 17.2.3 | Environment configuration |
+| Technology | Purpose |
+|------------|---------|
+| **Cloudflare Workers** + **Hono** | API server (edge-deployed) |
+| **Supabase PostgreSQL** | Database with RLS |
+| **Supabase Auth** | Authentication (email/password) |
+| **Supabase Storage** | Image/video file storage |
 
-### 2.3 AI & External Services
+### 2.3 Backend (Local Dev)
 
-| Service | Purpose | Integration Type |
-|---------|---------|-----------------|
-| **Google Gemini API** | Text generation (content planning) + Image generation | REST API via `@google/genai` SDK |
-| **NanoBanana API** | Alternative image generation (Standard, v2, Ultra/Flash sub-models) | Proxied REST API with polling |
-| **Kling AI** | Image-to-video generation (5-second videos, multiple camera angles) | REST API with JWT auth + webhook callbacks |
-| **Blotato API** | Social media publishing to Instagram (photos + reels) | REST API |
-| **Google Sheets** | Content calendar import | Public sheet fetch |
-| **Google Drive** | Media asset selection/override | URL-based integration |
+| Technology | Purpose |
+|------------|---------|
+| **Express.js** | Local API server |
+| **better-sqlite3** | Local SQLite database |
+| **Vite Proxy** | Routes /api to Express |
 
-### 2.4 Database
+### 2.4 AI & External Services
 
-| Technology | Type | Storage |
-|------------|------|---------|
-| **SQLite3** | Local file-based | `database.db` with 3 tables: `personas`, `days`, `video_tasks` |
-
-### 2.5 Infrastructure
-
-| Component | Technology |
-|-----------|-----------|
-| Dev Server (Frontend) | Vite on port 3000 |
-| API Server (Backend) | Express on port 3001 |
-| Proxy | Vite proxies `/api` and `/uploads` to backend |
-| Webhook Tunnel | ngrok for Kling video callbacks |
-| Asset Storage | Local filesystem at `/public/uploads/{personaId}/` |
+| Service | Purpose |
+|---------|---------|
+| **Google Gemini API** | Text generation (content planning, persona generation) + Image generation |
+| **NanoBanana API** | Primary image generation (Standard, v2, Ultra/Flash) |
+| **Kling AI** | Image-to-video generation (v1, v1-Pro, v1.5, v3) |
+| **Blotato API** | Social media publishing to Instagram |
 
 ---
 
-## 3. Database Schema
+## 3. Architecture
 
-### 3.1 Tables
+### 3.1 Workspace Layout (Canvas-Style)
 
 ```
-personas
-  - id: TEXT (PK)           -- UUID
-  - data: TEXT              -- JSON-serialized Persona object
-
-days
-  - id: TEXT (PK)           -- UUID
-  - personaId: TEXT         -- FK -> personas.id
-  - data: TEXT              -- JSON-serialized ContentDay object
-
-video_tasks
-  - taskId: TEXT (PK)       -- Kling task ID
-  - dayId: TEXT             -- FK -> days.id
-  - createdAt: INTEGER      -- Unix timestamp
+┌──────┬───────────────┬─────────────────────────────────────────────┐
+│ Rail │   Sidebar     │           Main Canvas                       │
+│ 72px │   280px       │           flex-1                            │
+│      │               │                                             │
+│ Logo │ Persona Info  │  Post Editor / Calendar / Persona Editor    │
+│ +New │ + New Post    │  Settings (slide-over panels)               │
+│      │ AI Prompt     │                                             │
+│ ○ P1 │ Import        │  ┌─Left Column──┬─Right Column─┐           │
+│ ○ P2 │ List/Calendar │  │ Content      │ Image        │           │
+│ ○ P3 │               │  │ sections     │ preview      │           │
+│      │ Day 1  [img]  │  │ (click to    │ + generate   │           │
+│      │ Day 2  [img]  │  │  edit)       │ + publish    │           │
+│      │ Day 3  [img]  │  │              │ + status     │           │
+│      │ ...           │  └──────────────┴──────────────┘           │
+│ ⚙    │               │                                             │
+└──────┴───────────────┴─────────────────────────────────────────────┘
 ```
 
-### 3.2 Persona Data Model (JSON in `personas.data`)
+### 3.2 Database Schema (Supabase)
 
-| Category | Fields |
-|----------|--------|
-| **Identity** | fullName, age, gender, nationality, birthplace, profession, locations[] |
-| **Appearance** | height, bodyType, faceShape, eyes, hair, distinctFeatures[] |
-| **Psychographic** | coreTraits[], interests[], values[], fears[], motivations[], mission |
-| **Fashion** | aesthetic, signatureItems[], photographyStyle |
-| **Lifestyle** | routine, diet, pet, socialMediaPresence |
-| **References** | referenceImageUrl, referenceImageUrls[] |
-| **AI Rules** | Custom JSON enforcement rules for generation consistency |
+**Tables:** personas, days, video_tasks, drive_assets, user_settings
 
-### 3.3 ContentDay Data Model (JSON in `days.data`)
-
-| Category | Fields |
-|----------|--------|
-| **Scheduling** | dayNumber, date, platforms[] |
-| **Content** | contentType (Photo/Carousel/Video), theme, sceneDescription |
-| **Copy** | onScreenText, caption, hook, hashtags, CTA |
-| **Metadata** | location, musicSuggestion, notes, hairstyle |
-| **Media** | generatedImageUrl, generatedVideoUrl, carouselSlides[] |
-| **Status** | status (draft/generating/completed/published), isGoodToPost, pendingVideoTaskId |
+All tables have `user_id` FK + Row Level Security. See `supabase/migrations/001_initial_schema.sql`.
 
 ---
 
-## 4. Features & Use Cases
+## 4. Features (Built)
 
-### 4.1 Persona Management
+### 4.1 Authentication
 
-#### UC-1: Create a New Persona
-**Description:** User creates a detailed virtual persona that serves as the consistent character across all generated content.
+- **Email/password sign-in and sign-up** via Supabase Auth
+- Session persists across page reloads
+- Auth token auto-injected into all API calls
+- User profile displayed in settings with sign-out
 
-**Flow:**
-1. Click "+" in the persona rail
-2. Persona editor modal opens with comprehensive fields
-3. Fill in identity, appearance, psychographic, fashion, and lifestyle details
-4. Upload reference images for AI consistency
-5. System creates dedicated upload folder at `/uploads/{personaId}/`
-6. Persona saved to SQLite database
+### 4.2 Persona Management
 
-**Persona Fields:**
-- **Identity:** Full name, age, gender, nationality, birthplace, profession, current locations
-- **Appearance:** Height, body type, face shape, eye details, hair details, distinct features
-- **Psychographic:** Core personality traits, interests, values, fears, motivations, personal mission
-- **Fashion & Style:** Aesthetic description, signature items, photography style preference
-- **Lifestyle:** Daily routine, diet, pet, social media presence description
-- **Reference Images:** Multiple reference image URLs for AI generation consistency
-- **AI Rules:** Custom JSON rules injected into every generation prompt for strict consistency
+#### Persona Card (Visual Editor)
+- **Visual card layout** — not a form. 3-column grid showing identity, bio, traits as a persona infographic
+- **Click-to-edit** on every field via InlineEdit component
+- **AI Persona Generation** — type a description (e.g., "24yo Italian lifestyle influencer"), Gemini populates all fields
+- AI prompt bar only shows for new/empty personas (hidden once populated)
+- **Tabbed interface:** Profile | Friends | Target Audience
 
-**Default Persona:** Ships with "Sofia Laurant" (Italian lifestyle creator) to demonstrate the feature.
+#### Persona Profile Tab
+- **Identity**: Full name, age, gender, nationality, birthplace, profession, locations (tags)
+- **Appearance**: Height, body type, face shape, eyes, hair, distinct features (tags)
+- **Social Handles**: Instagram, TikTok, YouTube, Twitter/X
+- **Psychographic**: Core traits, interests, values, motivations, fears (all as colored tags + bullet lists)
+- **Backstory**: Click-to-edit text block
+- **Mission**: Click-to-edit italic text
+- **Fashion & Style**: Aesthetic, photography style, signature items (tags)
+- **Lifestyle**: Routine, diet, pet, social media presence
+- **Reference Images**: Upload multiple images, click to set primary, remove with confirmation
+- **AI Analysis/Rules**: Collapsible JSON/text field for generation consistency enforcement
+- **Danger Zone**: Delete persona with full warning about data loss (bottom of Profile tab only)
 
-#### UC-2: Edit an Existing Persona
-Modify persona details via the editor modal. Changes affect all future content generation.
+#### Friends Tab (Recurring Characters)
+- Up to 6 friends/companions per persona
+- Each friend: photo (upload), name, relationship, traits (tags), profession
+- **Active/Inactive toggle** — deactivated friends dim and are excluded from content generation
+- Friends appear as named supporting characters in generated images with diversity rules
 
-#### UC-3: Delete a Persona
-"Danger Zone" section in editor modal. Confirms deletion and removes persona + all associated days from database.
+#### Target Audience Tab
+- Up to 6 audience segments per persona
+- Each segment: name, age range, gender skew, locations (tags), core aspiration, pain points (tags), content resonance notes
+- **Active/Inactive toggle** — inactive audiences hidden from post creation
+- **"Generate with AI"** — Gemini analyzes persona and suggests 3 audience segments
+- **Content Themes** — tag-based theme list (Fashion, Travel, Motivational, etc.)
 
-#### UC-4: Switch Between Personas
-Persona rail displays avatars (20px thumbnails with tooltips). Clicking switches the active persona context -- sidebar and main area update to show that persona's content.
+### 4.3 Content Creation (Posts)
 
----
+#### AI-First Post Creation
+1. Click **"+ New Post"** — prompt panel appears
+2. Describe what the influencer does: *"Sofia is traveling to Atlanta, visiting City Market..."*
+3. Select **target audience** (from persona's defined segments, shown as cards)
+4. Select **content focus** tags (from persona's content themes)
+5. Click **"Generate Post"** — Gemini generates ALL fields for all 3 content types (Photo, Carousel, Video) in one prompt
+6. Post appears as visual card with click-to-edit
 
-### 4.2 Content Planning
+#### Post Card (Visual Editor)
+- **Content type tabs**: Photo | Carousel | Video — switching shows type-specific fields
+- **Two-column layout**: Left = content sections, Right = media preview + actions
+- All text fields are **click-to-edit** (InlineEdit)
+- Auto-save with 1-second debounce
 
-#### UC-5: Create a Content Day Manually
-Click "New Day" to create a blank day with auto-incremented number and date. Fill in all fields:
-- Platform(s): Instagram, TikTok, YouTube
-- Content Type: Photo, Carousel, Video
-- Theme, scene description, on-screen text
-- Caption, hook, hashtags, CTA
-- Location tag, music suggestion, notes
+#### Photo Post
+- Scene description, on-screen text with **position selector** (Top/Middle/Bottom)
+- Text position previewed live on the image
+- Generate Image button, click image for full-screen lightbox
 
-#### UC-6: AI-Generated Content Plan
-Enter a natural language prompt (e.g., "Morning coffee at a Parisian cafe, cozy autumn vibes"). Gemini (`gemini-3-flash-preview`) returns structured JSON with all content day fields populated. User reviews, edits, and saves.
+#### Carousel Post
+- 4 numbered slide cards with per-slide scene description + overlay text
+- Generate All Slides button
+- Horizontal slide thumbnail selector
+- "+ Add slide" for more than 4
 
-**AI generates:** theme, scene description, caption, hashtags, CTA, music suggestion, location, and carousel slide descriptions (4 slides per carousel).
+#### Video/Reel Post
+- **Hook section** (prominent, amber) — first 1-3 seconds hook text
+- **Thumbnail concept** — description of click-worthy thumbnail
+- **Camera angle selector** — pills: Overhead, Zoom, Walking-in, Low angle, Close-up, Dolly, Pan, Tilt
+- **Audio/Music** suggestion
+- Generate Image → Generate Video pipeline
 
-#### UC-7: Import from Google Sheets
-Import a pre-planned content calendar from Google Sheets. Maps columns: day number, platform, content type, theme, scene description, hook, on-screen text, caption, hashtags, CTA, location, music, notes. Configurable start date and posts-per-day with duplicate avoidance.
+#### Post Fields (All Types)
+- Theme, scene description, caption, hook, CTA, hashtags
+- Location, music suggestion, notes
+- **Story Arc**: Beautiful Day, Real Moment, Achievement, Lesson, Invitation
+- **Caption Tone**: Aspirational, Relatable, Educational, Vulnerable, Playful
+- Platforms: Instagram, TikTok, YouTube (toggleable)
+- Hairstyle, style option
+- Good to Post toggle
 
-#### UC-8: Import via JSON
-Paste or upload structured JSON containing persona and day data. System creates corresponding entries.
+### 4.4 Image Generation
 
-#### UC-9: Calendar View
-Monthly calendar grid with posts grouped by date. Status indicators (New, Scheduled, Generating, Generated, Posted). Drag-and-drop to reschedule. Click to switch to detail view.
+- **NanoBanana API** (primary) — text-to-image and image-to-image with persona reference images
+- **Gemini** (fallback) — generates images with inline reference data
+- **Persona consistency** — reference images + AI analysis rules injected into every prompt
+- **Diversity rules** — primary persona is always focal point; supporting characters are diverse races/ethnicities
+- **Friends integration** — named friends included as supporting characters when applicable
+- **Text overlay** — browser-side canvas compositing at top/middle/bottom position
+- **Carousel generation** — sequential 4-slide generation with first slide as reference for consistency
+- Saves to Supabase Storage (production) or local filesystem (dev)
 
-#### UC-10: List View with Sidebar
-Sidebar navigation of all days for selected persona. Color-coded status badges and platform indicators. Click to load in main content area for editing.
+### 4.5 Video Generation
 
----
+- **Kling AI** (v1, v1-Pro, v1.5, v3) with camera angle selection
+- Image-to-video: generates 5-second video from a still image
+- **Polling mechanism**: checks status every 10 seconds, up to 16 minutes
+- **Webhook support**: Kling callback auto-links completed videos
+- Camera angles: overhead, zoom, walking-in, low-angle, action close-up, dolly zoom, pan, tilt
+- Video saved to storage, day updated automatically
 
-### 4.3 Image Generation
+### 4.6 Publishing
 
-#### UC-11: Generate AI Image with Gemini
-Primary image generation using `gemini-3.1-flash-image-preview`:
-- Constructs prompt from persona appearance + scene description + style modifiers
-- Sends reference images for consistency
-- Enforces: "DO NOT ALTER THE FACE, HAIR, OR BASE FEATURES"
-- Hairstyle randomly selected from 11 predefined styles
-- Generates 9:16 aspect ratio (1K resolution)
-- Saves to `/public/uploads/{personaId}/`
+- **Blotato API** integration for Instagram publishing
+- Publishes photos as posts, videos as Reels
+- Hashtags limited to 5 for Instagram
+- **Auto-scheduling**: configure posting times in Settings, posts with "Good to Post" flag auto-publish
+- **Distributed time slots**: evenly spaces posts between start and end time (displayed in Settings)
+- Status updates to "published" after successful post
 
-**Style Options:** Luxury/High-end, Casual/Street, Morning Cozy, Elegant Evening, Formal/Corporate
+### 4.7 Content Calendar
 
-**Consistency Features:**
-- Persona reference images sent with every request
-- Post-level image references (Location, Style, FaceSwap tags)
-- AI rules enforce character consistency
-- Candid/unposed shot direction
+- **Monthly grid view** with image thumbnails per day
+- **Drag-and-drop** to reschedule posts (change date)
+- **Published posts locked** — cannot drag, shown with lock badge
+- **Duplicate button** on published posts — creates draft copy with "(Copy)" suffix and today's date
+- Month navigation (prev/next)
+- Click day cell to select post and switch to editor
 
-#### UC-12: Generate AI Image with NanoBanana
-Alternative generation via NanoBanana API (proxied through backend). Sub-models: Standard, v2, Ultra/Flash. Supports text-to-image and image-to-image. Polling: every 5 seconds, up to 2.5 min timeout.
+### 4.8 Sidebar & Navigation
 
-#### UC-13: Generate Carousel Images
-4-slide carousels with sequential generation. First slide uses full persona reference; subsequent slides use first slide as additional reference for consistency (clothing, hairstyle, accessories maintained across slides).
+- **Persona rail**: Avatar circles, click to switch, selected ring highlight
+- **Content sidebar**: Persona info, action buttons, scrollable day list
+- Day list shows: date box, theme, status badge, platform letters, image thumbnail
+- **Published posts** show lock icon + duplicate button on hover
+- **View toggle**: List view / Calendar view
 
-#### UC-14: Use Google Drive Media
-Select pre-existing media from Google Drive dropdown. Formats URL for direct download.
+### 4.9 Settings
 
-#### UC-15: Manual Media URL Override
-Enter any publicly accessible image/video URL to bypass AI generation.
+- **API Keys**: NanoBanana, Kling (key + secret), Blotato — password fields with show/hide
+- **Google Drive**: Folder URL for media library
+- **Posting Configuration**: Mode (manual/auto), posts per day, start time, end time
+- **Distributed time slots** calculated and displayed
+- **Network**: Public tunnel URL for webhooks
+- **Save button** (explicit) + auto-save
+- **Account section**: User email, sign-out
 
----
+### 4.10 Google Sheets Import
 
-### 4.4 Video Generation
+- Import content calendar from public Google Sheet
+- Configurable: Sheet ID, sheet name, start date, posts per day
+- Avoid duplicates checkbox
+- Maps columns to ContentDay fields
 
-#### UC-16: Generate Video from Image (Kling AI)
-Convert a generated image into a 5-second video:
+### 4.11 UX Features
 
-1. Select camera angle from 8 options: overhead, zoom, walking-in, low-angle, action close-up, dolly zoom, pan, tilt
-2. System generates JWT token (HS256, 30-min expiry)
-3. Sends image + prompt + camera to Kling API (with Singapore fallback)
-4. Stores `taskId -> dayId` in `video_tasks` table
-5. Kling processes asynchronously; webhook at `/api/videos/callback` receives result
-6. Video auto-downloads to `/public/uploads/`; day updated with `generatedVideoUrl`
-
-**Model Options:** v1, v1-Pro, v1.5, v3
-
----
-
-### 4.5 Publishing & Posting
-
-#### UC-17: Publish to Instagram (Manual)
-1. Click "Publish" on a reviewed content day
-2. System fetches connected Instagram account via Blotato API
-3. Uploads media to Blotato servers
-4. Applies text overlay on images (semi-transparent box, bottom-aligned, max 3 lines)
-5. Publishes as Photo post or Reel (for videos)
-6. Hashtags limited to 5 for Instagram
-7. Returns `platformPostId`; status updates to "published"
-
-#### UC-18: Auto-Schedule Publishing
-1. Enable "Auto-schedule" in Settings with daily posting time
-2. System polls every 30 seconds
-3. Publishes posts matching: today's date + `isGoodToPost=true` + not yet published
-4. Sequential queue with 2-minute gaps between posts
-5. Status auto-updates to "published"
-
-#### UC-19: Mark as "Good to Post"
-Toggle `isGoodToPost` flag after reviewing content. Required for auto-scheduling eligibility.
-
----
-
-### 4.6 Settings & Configuration
-
-#### UC-20: Configure API Keys & Services
-Settings panel with:
-- **NanoBanana:** API key + sub-model selection (Standard, v2, Ultra/Flash)
-- **Kling Video:** API key + secret + model selection (v1, v1-Pro, v1.5, v3)
-- **Blotato:** API key for social publishing
-- **Public Tunnel URL:** ngrok URL for webhook callbacks
-- **Publishing Mode:** Manual or Auto-schedule with daily time picker
-
-All settings persist in `localStorage`.
-
----
-
-## 5. User Flows
-
-### 5.1 End-to-End: Persona to Published Post
-
-```
-Create Persona --> Plan Content Calendar --> Generate Images --> Generate Videos (opt.)
-      |                    |                      |                       |
- Define identity,   AI-generate plan,      Gemini / NanoBanana     Kling converts
- appearance, style  import Sheets/JSON,    with persona refs       image to 5s video
- + reference imgs   or create manually
-      |                    |                      |                       |
-      v                    v                      v                       v
-                  Review & Approve  -------->  Publish to Instagram
-                  (isGoodToPost)               Manual or Auto-scheduled
-```
-
-### 5.2 Persona Setup Flow
-
-```
-1. Click "+" in persona rail
-2. Fill identity (name, age, profession, nationality)
-3. Define appearance (face, eyes, hair, body, distinct features)
-4. Set psychographic profile (traits, interests, values, motivations)
-5. Describe fashion aesthetic and signature items
-6. Upload reference images (critical for AI consistency)
-7. Add custom AI rules (optional JSON enforcement)
-8. Save -> folder created at /uploads/{personaId}/
-```
-
-### 5.3 Content Day: Idea to Post
-
-```
-1. Select persona
-2. Create day (manual or AI-assisted)
-3. Fill: theme, scene description, caption, hashtags
-4. Choose type (Photo / Carousel / Video)
-5. Generate image (select style + model)
-6. Review generated image
-7. Generate video from image (optional)
-8. Mark "Good to Post"
-9. Publish (manual or auto-schedule)
-10. Status -> "Published"
-```
+- **Mobile responsive**: Collapsible sidebar, stacked layout, mobile top bar
+- **Dark theme**: Black & white with rose/social accent colors
+- **Custom logo**: CreatorStudio brand logo as favicon and sidebar icon
+- **Confirmation modals**: Styled modal for all destructive actions (not browser confirm dialogs)
+- **Lightbox**: Full-screen image preview on click
+- **Blur effect**: Persona rail and sidebar blur when editor/settings panels are open
+- **Published post locking**: View-only mode with duplicate option
+- **Auto-save**: 1-second debounce on all edits
 
 ---
 
-## 6. Architecture Diagram
+## 5. Data Models
 
+### 5.1 Persona
+
+```typescript
+interface Persona {
+  id: string;
+  identity: { fullName, age, gender, nationality, birthplace, profession, locations[] };
+  appearance: { height, bodyType, faceShape, eyes, hair, distinctFeatures[] };
+  psychographic: { coreTraits[], interests[], values[], fears[], motivations[], mission };
+  backstory: string;
+  fashionStyle: { aesthetic, signatureItems[], photographyStyle };
+  lifestyle: { routine, diet, pet?, socialMediaPresence };
+  socialHandles?: { instagram?, tiktok?, youtube?, twitter?, x? };
+  referenceImageUrl?: string;
+  referenceImageUrls?: string[];
+  aiAnalysis?: string;
+  targetAudiences?: TargetAudience[];
+  contentThemes?: string[];
+  friends?: PersonaFriend[];
+}
 ```
-+------------------+         +------------------+         +------------------+
-|   React + Vite   |  proxy  |   Express API    |         |    SQLite DB     |
-|   (Port 3000)    | ------> |   (Port 3001)    | ------> |  (database.db)   |
-|   TypeScript     |         |   TypeScript     |         |  3 tables        |
-|   Tailwind CSS   |         |   better-sqlite3 |         |                  |
-+------------------+         +--------+---------+         +------------------+
-                                      |
-                     +----------------+----------------+
-                     |                |                |
-               +-----------+   +-----------+   +-----------+
-               | Gemini    |   | NanoBanana|   | Kling AI  |
-               | API       |   | API       |   | API       |
-               | text +    |   | image gen |   | video gen |
-               | image gen |   |           |   | + webhook |
-               +-----------+   +-----------+   +-----------+
-                     |                               |
-               +-----------+                   +-----------+
-               | Google    |                   | Blotato   |
-               | Sheets +  |                   | API       |
-               | Drive     |                   +-----------+
-               +-----------+                         |
-                                               +-----------+
-                                               | Instagram |
-                                               +-----------+
+
+### 5.2 PersonaFriend
+
+```typescript
+interface PersonaFriend {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  traits: string[];
+  profession?: string;
+  relationship?: string;
+  active?: boolean;
+}
+```
+
+### 5.3 TargetAudience
+
+```typescript
+interface TargetAudience {
+  id: string;
+  segmentName: string;
+  ageRange: string;
+  genderSkew: string;
+  locations: string[];
+  coreAspiration: string;
+  painPoints: string[];
+  contentResonanceNotes: string;
+  active?: boolean;
+}
+```
+
+### 5.4 ContentDay (Post)
+
+```typescript
+interface ContentDay {
+  id: string;
+  dayNumber: number;
+  date: string;
+  platforms: Platform[];
+  theme, sceneDescription, onScreenText, caption, hook, hashtags, cta: string;
+  location, musicSuggestion, notes: string;
+  contentType: 'Photo' | 'Carousel' | 'Video';
+  generatedImageUrl?, generatedVideoUrl?, customMediaUrl?: string;
+  pendingVideoTaskId?: string;
+  status: 'draft' | 'generating' | 'completed' | 'published';
+  personaId: string;
+  styleOption?, hairstyle?: string;
+  isAIGenerated?, isGoodToPost?: boolean;
+  textPosition?: 'top' | 'middle' | 'bottom';
+  storyArc?: 'Beautiful Day' | 'Real Moment' | 'Achievement' | 'Lesson' | 'Invitation';
+  captionTone?: 'Aspirational' | 'Relatable' | 'Educational' | 'Vulnerable' | 'Playful';
+  targetAudienceSegment?: string;
+  audienceMirrorHook?: string;
+  featuredProducts?: FeaturedProduct[];
+  postImageReferences?: { id, url, tag }[];
+  slides?: CarouselSlide[];
+}
+```
+
+### 5.5 UserSettings
+
+```typescript
+interface UserSettings {
+  blotatoApiKey?, klingApiKey?, klingApiSecret?, nanobananaApiKey?: string;
+  driveFolderUrl?, publicTunnelUrl?: string;
+  postingMode?: 'manual' | 'auto';
+  postingTime?, postingEndTime?: string;
+  postsPerDay?: number;
+}
 ```
 
 ---
 
-## 7. API Reference
+## 6. API Reference
 
 ### Personas
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/personas` | List all personas |
-| POST | `/api/personas` | Create or update persona |
-| DELETE | `/api/personas/:id` | Delete persona + associated content |
+| GET | `/api/personas` | List all personas (normalized columns → camelCase) |
+| POST | `/api/personas` | Create or update persona (camelCase → snake_case) |
+| DELETE | `/api/personas/:id` | Delete persona + cascade days |
 
-### Content Days
+### Content Days (Posts)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/days` | List all content days |
@@ -388,7 +392,7 @@ Create Persona --> Plan Content Calendar --> Generate Images --> Generate Videos
 ### Images
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/images/save` | Save base64 image to local storage |
+| POST | `/api/images/save` | Save base64 image to storage |
 | POST | `/api/nanobanana/proxy` | Proxy image generation to NanoBanana |
 
 ### Videos
@@ -396,7 +400,7 @@ Create Persona --> Plan Content Calendar --> Generate Images --> Generate Videos
 |--------|----------|-------------|
 | POST | `/api/videos/generate` | Trigger Kling video generation |
 | GET | `/api/videos/status/:taskId` | Check video generation status |
-| POST | `/api/videos/save` | Download and save video locally |
+| POST | `/api/videos/save` | Download and save video to storage |
 | POST | `/api/videos/callback` | Webhook for Kling async completion |
 
 ### Publishing
@@ -404,51 +408,38 @@ Create Persona --> Plan Content Calendar --> Generate Images --> Generate Videos
 |--------|----------|-------------|
 | POST | `/api/blotato/publish` | Publish content to Instagram via Blotato |
 
----
+### Settings
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/settings` | Get user settings (snake_case → camelCase) |
+| POST | `/api/settings` | Save user settings (camelCase → snake_case) |
 
-## 8. Current Limitations
-
-| Limitation | Detail |
-|-----------|--------|
-| **Local-Only** | No cloud deployment; runs on developer's machine |
-| **Single-User** | No authentication or multi-user support |
-| **Instagram-Only Publishing** | TikTok and YouTube publishing not yet implemented |
-| **SQLite** | Not production-scale; adequate for local use |
-| **ngrok Required** | Video callbacks need an active ngrok tunnel |
-| **No Asset Versioning** | Regeneration overwrites previous images; no history |
-| **Unencrypted Keys** | API keys stored in browser localStorage |
-| **Google Drive Mock** | Drive file selection is partially mocked |
-
----
-
-## 9. Future Roadmap Considerations
-
-| Area | Ideas |
-|------|-------|
-| **Platforms** | TikTok publishing, YouTube Shorts, Twitter/X, LinkedIn |
-| **Persona** | AI-assisted persona creation from reference photos, voice/tone training |
-| **Analytics** | Post performance tracking, optimal posting times, hashtag insights |
-| **Collaboration** | Multi-user with roles (creator/reviewer/publisher), approval workflows |
-| **Infrastructure** | Cloud deployment (Supabase), encrypted credentials, CDN, job queues |
-| **Content** | A/B testing for captions, trending audio suggestions, template library |
+### Google Drive
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/drive/list` | Sync files from Google Drive folder |
+| GET | `/api/drive/assets` | Query drive assets with filters |
+| PATCH | `/api/drive/assets/:id` | Update drive asset status |
+| GET | `/api/drive/stats` | Aggregate drive asset counts |
 
 ---
 
-## 10. Glossary
+## 7. Pending / Upcoming Features
 
-| Term | Definition |
-|------|-----------|
-| **Persona** | A detailed virtual character profile for consistent AI content generation |
-| **Content Day** | A single planned post with all metadata (caption, hashtags, media, etc.) |
-| **Carousel** | A multi-slide Instagram post (4 slides in Creator Studio) |
-| **Reel** | A short-form video post on Instagram |
-| **Blotato** | Third-party API for publishing to social media platforms |
-| **NanoBanana** | Third-party AI image generation service |
-| **Kling AI** | Third-party AI video generation service (image-to-video) |
-| **Reference Image** | Persona photo used to maintain visual consistency in AI generation |
-| **isGoodToPost** | Flag indicating content is reviewed and approved for publishing |
-| **Content Type** | Photo, Carousel, or Video |
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Cloudflare Deployment** | Deploy Worker + Pages to production | P0 |
+| **Google Drive Image Selection** | Select images/videos from Drive per post, multi-select for carousels | P0 |
+| **Products/Affiliates Catalog** | Per-persona product library with visual descriptions for AI prompt injection | P1 |
+| **Product Picker per Post** | Attach products to posts, inject into image prompts and captions | P1 |
+| **Facebook/Instagram Direct API** | Replace Blotato with direct Meta Graph API posting | P1 |
+| **TikTok Publishing** | Direct TikTok API integration | P2 |
+| **Storyline View** | Visual timeline showing narrative progression across posts | P2 |
+| **Content Mix Dashboard** | % breakdown of story arcs + audience coverage analytics | P2 |
+| **Light Mode Theme** | Alternate light theme option | P2 |
+| **Supabase Realtime** | Replace video polling with realtime subscriptions | P3 |
+| **Cloudflare Cron** | Move auto-scheduler from client to server-side cron | P3 |
 
 ---
 
-*This PRD reflects the current state of Creator Studio as of March 2026. It is a living document for communicating the product's capabilities, architecture, and use cases to stakeholders and for planning future development.*
+*This PRD reflects Creator Studio as of March 30, 2026 — Version 2.0 rebuild with canvas workspace, AI-first content creation, target audience integration, and visual persona cards.*

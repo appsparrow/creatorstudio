@@ -1,3 +1,5 @@
+import { proxyNanoBanana } from './api';
+
 export interface NanoBananaGenerateRequest {
   prompt: string;
   type: 'TEXTTOIAMGE' | 'IMAGETOIAMGE';
@@ -19,26 +21,15 @@ export interface NanoBananaResponse {
   }
 }
 
-const BASE_URL = 'https://api.nanobananaapi.ai';
-
 export async function generateImageNanoBanana(request: NanoBananaGenerateRequest, apiKey: string): Promise<string> {
-  const endpoint = request.type === 'IMAGETOIAMGE' ? '/api/v1/nanobanana/generate' : '/api/v1/nanobanana/generate'; 
-  
-  const response = await fetch('/api/nanobanana/proxy', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      endpoint,
-      apiKey,
-      payload: {
-        ...request,
-        numImages: request.numImages || 1,
-        image_size: request.image_size || '4:5',
-      }
-    })
+  const endpoint = '/api/v1/nanobanana/generate';
+
+  const data: NanoBananaResponse = await proxyNanoBanana(endpoint, apiKey, {
+    ...request,
+    numImages: request.numImages || 1,
+    image_size: request.image_size || '4:5',
   });
 
-  const data: NanoBananaResponse = await response.json();
   if (data.code !== 200) {
     throw new Error(`NanoBanana API Error: ${data.message}`);
   }
@@ -55,16 +46,12 @@ export async function generateImageNanoBanana(request: NanoBananaGenerateRequest
     await new Promise(resolve => setTimeout(resolve, pollInterval));
     attempts++;
 
-    const statusResponse = await fetch('/api/nanobanana/proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        endpoint: `/api/v1/nanobanana/record-info?taskId=${taskId}`,
-        method: 'GET',
-        apiKey
-      })
-    });
-    const statusData: NanoBananaResponse = await statusResponse.json();
+    const statusData: NanoBananaResponse = await proxyNanoBanana(
+      `/api/v1/nanobanana/record-info?taskId=${taskId}`,
+      apiKey,
+      {},
+      'GET'
+    );
 
     if (statusData.data.successFlag === 1) {
       if (statusData.data.response?.resultImageUrl) {

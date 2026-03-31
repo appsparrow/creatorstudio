@@ -375,116 +375,167 @@ app.post('/api/videos/callback', async (req, res) => {
 });
 
 // --- Blotato Direct Publisher Real API Integration ---
+// Supports Instagram + TikTok. Publishes to all requested platforms.
 app.post('/api/blotato/publish', async (req, res) => {
     try {
-        const { image, video, caption, hashtags, onScreenText, contentType, blotatoApiKey, dayId } = req.body;
+        const { image, video, caption, hashtags, onScreenText, contentType, blotatoApiKey, dayId, isDraft, scheduledTime, platforms } = req.body;
         if (!blotatoApiKey) {
             return res.status(400).json({ error: "Blotato API Key missing. Please set it in Settings." });
         }
 
-        console.log(`\n[Blotato Publisher] Preparing live request for DayID: ${dayId}...`);
+        // Default behavior for videos:
+        //   TikTok → isDraft (supported by Blotato)
+        //   Instagram → schedule 1 hour from now (isDraft NOT supported for Instagram)
+        // Photos → publish live on all platforms
+        const isVideoContent = !!video;
+        const userWantsDraft = isDraft !== undefined ? isDraft : isVideoContent;
 
-        // 1. Fetch the user's connected Blotato accounts to get the required Account ID (Targeting Instagram directly)
-        const accountsRes = await fetch('https://backend.blotato.com/v2/users/me/accounts?platform=instagram', {
-            headers: { 'Authorization': `Bearer ${blotatoApiKey}`, 'x-api-key': blotatoApiKey }
+        // Platforms to publish to (default: ['instagram'])
+        const targetPlatforms: string[] = platforms || ['instagram'];
+
+        console.log(`\n[Blotato Publisher] DayID: ${dayId} | Platforms: ${targetPlatforms.join(',')} | WantsDraft: ${userWantsDraft} | Type: ${isVideoContent ? 'video' : 'photo'}`);
+
+        // 1. Fetch ALL connected accounts
+        const authHeaders = { 'Authorization': `Bearer ${blotatoApiKey}`, 'x-api-key': blotatoApiKey };
+        const accountsRes = await fetch('https://backend.blotato.com/v2/users/me/accounts', {
+            headers: authHeaders
         });
-        
+
         if (!accountsRes.ok) {
             const err = await accountsRes.text();
             throw new Error(`Failed to authenticate with Blotato: ${err}`);
         }
-        
-        const accountsData = await accountsRes.json();
-        console.log(`[Blotato Publisher] Raw Accounts API Response:`, JSON.stringify(accountsData, null, 2));
-        
-        // Blotato docs specify response is in `{ items: [...] }`
-        const accountsArray = Array.isArray(accountsData) ? accountsData : accountsData.items || accountsData.data || [];
-        const targetAccount = accountsArray.find((acc: any) => acc.platform === 'instagram') || accountsArray[0];
 
-        if (!targetAccount || !targetAccount.id) {
-            throw new Error(`No connected Instagram account found. Blotato returned: ${JSON.stringify(accountsData)}`);
+        const accountsData = await accountsRes.json();
+        const accountsArray = Array.isArray(accountsData) ? accountsData : accountsData.items || accountsData.data || [];
+        console.log(`[Blotato Publisher] Found ${accountsArray.length} connected accounts: ${accountsArray.map((a: any) => `${a.platform}(${a.id})`).join(', ')}`);
+
+        // Find accounts for each target platform
+        const instagramAccount = accountsArray.find((acc: any) => acc.platform === 'instagram');
+        const tiktokAccount = accountsArray.find((acc: any) => acc.platform === 'tiktok');
+
+        if (targetPlatforms.includes('instagram') && !instagramAccount) {
+            console.warn('[Blotato Publisher] No Instagram account connected — skipping Instagram');
+        }
+        if (targetPlatforms.includes('tiktok') && !tiktokAccount) {
+            console.warn('[Blotato Publisher] No TikTok account connected — skipping TikTok');
+        }
+
+        const targetAccount = instagramAccount || tiktokAccount || accountsArray[0];
+        if (!targetAccount) {
+            throw new Error('No connected social media accounts found in Blotato.');
         }
 
         console.log(`[Blotato Publisher] Found Account ID: ${targetAccount.id}. Sending post...`);
 
-        // 2. Upload Local Media to Blotato Servers natively (Bypasses Ngrok Free-Tier Anti-Phishing blocks)
-        const processMedia = async (mediaPath: string) => {
-             // Handle local or mapped Google Drive downloads!
-             if (mediaPath.includes('/uploads/') || mediaPath.startsWith('http')) {
-                 let buffer: Buffer;
-                 let mimeType = 'image/jpeg';
-                 
-                 if (mediaPath.includes('/uploads/')) {
-                     const localRelativePath = mediaPath.substring(mediaPath.indexOf('/uploads/'));
-                     const absoluteDiskPath = path.join(__dirname, 'public', localRelativePath);
-                     if (!fs.existsSync(absoluteDiskPath)) throw new Error(`Media not found locally: ${absoluteDiskPath}`);
+        // 2. Process media — strategy depends on source and type:
+        //    - Google Drive URLs → convert to direct download URL, pass to Blotato directly (no size limit)
+        //    - Remote URLs (videos) → pass directly to Blotato (Blotato fetches it)
+        //    - Remote URLs (images with text) → download, burn text, upload as base64
+        //    - Local files (small) → upload as base64
+        //    - Local files (large videos) → need public URL via tunnel
 
-                     console.log(`[Blotato Publisher] Processing local media ${localRelativePath} ...`);
-                     buffer = fs.readFileSync(absoluteDiskPath);
-                     mimeType = localRelativePath.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';
-                 } else {
-                     console.log(`[Blotato Publisher] Fetching Remote Media Buffer -> ${mediaPath} ...`);
-                     const dlRes = await fetch(mediaPath);
-                     if (!dlRes.ok) throw new Error("Failed to download remote media buffer: " + (await dlRes.text()));
-                     const arrayBuffer = await dlRes.arrayBuffer();
-                     buffer = Buffer.from(arrayBuffer);
-                     mimeType = dlRes.headers.get('content-type') || 'image/jpeg';
+        const isGoogleDriveUrl = (url: string) =>
+          url.includes('drive.google.com') || url.includes('googleusercontent.com');
+
+        const getDirectDriveUrl = (url: string) => {
+          // Convert Google Drive share URLs to direct download URLs
+          const match = url.match(/\/file\/d\/([-_a-zA-Z0-9]+)/);
+          if (match) return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+          const idMatch = url.match(/[?&]id=([-_a-zA-Z0-9]+)/);
+          if (idMatch) return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+          return url;
+        };
+
+        const uploadToBlotato = async (dataUri: string) => {
+          const uploadRes = await fetch('https://backend.blotato.com/v2/media', {
+            method: 'POST',
+            headers: { ...authHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: dataUri })
+          });
+          if (!uploadRes.ok) throw new Error(`Blotato Media Upload Failed: ${await uploadRes.text()}`);
+          const uploadData = await uploadRes.json();
+          return uploadData.url;
+        };
+
+        const processMedia = async (mediaPath: string, isVideoMedia: boolean) => {
+             if (!mediaPath) return null;
+
+             // Google Drive URLs — pass directly, no download needed (bypasses 20MB base64 limit)
+             if (isGoogleDriveUrl(mediaPath)) {
+                 const directUrl = getDirectDriveUrl(mediaPath);
+                 console.log(`[Blotato Publisher] Using Google Drive direct URL: ${directUrl}`);
+                 // Upload the URL to Blotato (Blotato fetches it server-side, no base64 limit)
+                 const uploadRes = await fetch('https://backend.blotato.com/v2/media', {
+                   method: 'POST',
+                   headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                   body: JSON.stringify({ url: directUrl })
+                 });
+                 if (!uploadRes.ok) {
+                   const errText = await uploadRes.text();
+                   // If URL upload fails, Blotato might accept it directly in mediaUrls
+                   console.warn(`[Blotato Publisher] URL upload failed (${errText}), using direct URL in mediaUrls`);
+                   return directUrl;
                  }
-                 
+                 const uploadData = await uploadRes.json();
+                 console.log(`[Blotato Publisher] Drive media hosted at: ${uploadData.url}`);
+                 return uploadData.url;
+             }
+
+             // Remote HTTP URLs — for videos, pass directly; for images, download for text overlay
+             if (mediaPath.startsWith('http')) {
+                 if (isVideoMedia) {
+                     // Videos: pass URL directly to Blotato (no text overlay, no download needed)
+                     console.log(`[Blotato Publisher] Passing remote video URL directly: ${mediaPath}`);
+                     try {
+                       return await uploadToBlotato(mediaPath);
+                     } catch {
+                       console.log(`[Blotato Publisher] URL upload failed, using direct URL`);
+                       return mediaPath;
+                     }
+                 }
+                 // Images: download for potential text overlay
+                 console.log(`[Blotato Publisher] Downloading remote image for text overlay: ${mediaPath}`);
+                 const dlRes = await fetch(mediaPath);
+                 if (!dlRes.ok) throw new Error("Failed to download remote image: " + (await dlRes.text()));
+                 const arrayBuffer = await dlRes.arrayBuffer();
+                 let buffer = Buffer.from(arrayBuffer);
+                 let mimeType = dlRes.headers.get('content-type') || 'image/jpeg';
                  let finalBase64 = buffer.toString('base64');
-                 
-                 // --- CANVAS TEXT BURNER (Images Only) ---
+
+                 // Apply text overlay on images
                  if (mimeType.includes('image') && onScreenText) {
-                    console.log(`[Blotato Publisher] Applying Text Burner overlay to image...`);
+                    console.log(`[Blotato Publisher] Applying text overlay to image...`);
                     const img = await loadImage(buffer);
                     const canvas = createCanvas(img.width, img.height);
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, img.width, img.height);
-                    
                     const boxWidth = img.width * 0.75;
-                    const fontSize = Math.floor(img.width * 0.038); // tighter, elegantly smaller scaling
+                    const fontSize = Math.floor(img.width * 0.038);
                     const padding = fontSize * 1.5;
                     const lineHeight = fontSize * 1.35;
-                    
                     ctx.font = `bold ${fontSize}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    
-                    // Flatten out AI-generated newlines into a continuous string
-                    const cleanContinuousText = onScreenText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-                    const words = cleanContinuousText.split(' ');
-                    
+                    const cleanText = onScreenText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                    const words = cleanText.split(' ');
                     let line = '';
-                    const lines = [];
+                    const lines: string[] = [];
                     for (let n = 0; n < words.length; n++) {
                         const testLine = line + words[n] + ' ';
-                        const metrics = ctx.measureText(testLine);
-                        if (metrics.width > (boxWidth - padding * 2) && n > 0) {
-                            if (lines.length >= 2) { 
-                                // Hard cap at maximum 3 lines: replace last word logic with an ellipsis
-                                line = line.trim() + '...';
-                                break; 
-                            }
-                            lines.push(line);
-                            line = words[n] + ' ';
-                        } else {
-                            line = testLine;
-                        }
+                        if (ctx.measureText(testLine).width > (boxWidth - padding * 2) && n > 0) {
+                            if (lines.length >= 2) { line = line.trim() + '...'; break; }
+                            lines.push(line); line = words[n] + ' ';
+                        } else { line = testLine; }
                     }
-                    if (lines.length < 3 && line) {
-                        lines.push(line);
-                    }
-                    
+                    if (lines.length < 3 && line) lines.push(line);
                     const boxHeight = (lines.length * lineHeight) + (padding * 1.5);
                     const boxX = (img.width - boxWidth) / 2;
-                    const boxY = img.height - boxHeight - (img.height * 0.12); // Place 12% above bottom frame
-                    const r = Math.min(24, boxHeight / 2); // rounded corner radius
-
-                    // Background Box
+                    const boxY = img.height - boxHeight - (img.height * 0.12);
+                    const r = Math.min(24, boxHeight / 2);
                     ctx.fillStyle = 'rgba(70, 60, 50, 0.85)';
                     ctx.beginPath();
-                    ctx.moveTo(boxX + r, boxY);
-                    ctx.lineTo(boxX + boxWidth - r, boxY);
+                    ctx.moveTo(boxX + r, boxY); ctx.lineTo(boxX + boxWidth - r, boxY);
                     ctx.quadraticCurveTo(boxX + boxWidth, boxY, boxX + boxWidth, boxY + r);
                     ctx.lineTo(boxX + boxWidth, boxY + boxHeight - r);
                     ctx.quadraticCurveTo(boxX + boxWidth, boxY + boxHeight, boxX + boxWidth - r, boxY + boxHeight);
@@ -492,96 +543,173 @@ app.post('/api/blotato/publish', async (req, res) => {
                     ctx.quadraticCurveTo(boxX, boxY + boxHeight, boxX, boxY + boxHeight - r);
                     ctx.lineTo(boxX, boxY + r);
                     ctx.quadraticCurveTo(boxX, boxY, boxX + r, boxY);
-                    ctx.closePath();
-                    ctx.fill();
-                    
-                    // Text
+                    ctx.closePath(); ctx.fill();
                     ctx.fillStyle = '#ffffff';
-                    let textY = boxY + padding + (fontSize/2);
-                    for (const l of lines) {
-                        ctx.fillText(l.trim(), img.width / 2, textY);
-                        textY += lineHeight;
-                    }
-
-                    // Export the newly stamped PNG buffer directly into Base64 format!
+                    let textY = boxY + padding + (fontSize / 2);
+                    for (const l of lines) { ctx.fillText(l.trim(), img.width / 2, textY); textY += lineHeight; }
                     const outputBuffer = canvas.toBuffer('image/jpeg', { quality: 0.95 });
                     finalBase64 = outputBuffer.toString('base64');
+                    mimeType = 'image/jpeg';
                  }
-                 // ----------------------------------------
-                 
-                 const dataUri = `data:${mimeType};base64,${finalBase64}`;
 
-                 console.log(`[Blotato Publisher] Uploading finalized media to Blotato Hosting...`);
-                 const uploadRes = await fetch('https://backend.blotato.com/v2/media', {
-                     method: 'POST',
-                     headers: {
-                         'Authorization': `Bearer ${blotatoApiKey}`,
-                         'x-api-key': blotatoApiKey,
-                         'Content-Type': 'application/json'
-                     },
-                     body: JSON.stringify({ url: dataUri })
-                 });
-
-                 if (!uploadRes.ok) {
-                     throw new Error(`Blotato Media Upload Failed: ${await uploadRes.text()}`);
-                 }
-                 const uploadData = await uploadRes.json();
-                 console.log(`[Blotato Publisher] Media successfully uploaded onto Blotato: ${uploadData.url}`);
-                 return uploadData.url;
+                 return await uploadToBlotato(`data:${mimeType};base64,${finalBase64}`);
              }
+
+             // Local files
+             if (mediaPath.includes('/uploads/')) {
+                 const localRelativePath = mediaPath.substring(mediaPath.indexOf('/uploads/'));
+                 const absoluteDiskPath = path.join(__dirname, 'public', localRelativePath);
+                 if (!fs.existsSync(absoluteDiskPath)) throw new Error(`Media not found locally: ${absoluteDiskPath}`);
+                 console.log(`[Blotato Publisher] Processing local file: ${localRelativePath}`);
+                 const buffer = fs.readFileSync(absoluteDiskPath);
+                 const mimeType = localRelativePath.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';
+
+                 // Check size — if >15MB, we can't base64 upload. Need public URL.
+                 if (buffer.length > 15 * 1024 * 1024) {
+                     console.warn(`[Blotato Publisher] File too large for base64 (${(buffer.length / 1024 / 1024).toFixed(1)}MB). Needs public tunnel URL.`);
+                     throw new Error(`File is ${(buffer.length / 1024 / 1024).toFixed(1)}MB — too large for base64 upload. Use a Google Drive link or public tunnel URL.`);
+                 }
+
+                 let finalBase64 = buffer.toString('base64');
+
+                 // Text overlay for local images
+                 if (mimeType.includes('image') && onScreenText) {
+                    const img = await loadImage(buffer);
+                    const canvas = createCanvas(img.width, img.height);
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, img.width, img.height);
+                    const boxWidth = img.width * 0.75;
+                    const fontSize = Math.floor(img.width * 0.038);
+                    const padding = fontSize * 1.5;
+                    const lineHeight = fontSize * 1.35;
+                    ctx.font = `bold ${fontSize}px sans-serif`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    const cleanText = onScreenText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                    const words = cleanText.split(' ');
+                    let line = '';
+                    const lines: string[] = [];
+                    for (let n = 0; n < words.length; n++) {
+                        const testLine = line + words[n] + ' ';
+                        if (ctx.measureText(testLine).width > (boxWidth - padding * 2) && n > 0) {
+                            if (lines.length >= 2) { line = line.trim() + '...'; break; }
+                            lines.push(line); line = words[n] + ' ';
+                        } else { line = testLine; }
+                    }
+                    if (lines.length < 3 && line) lines.push(line);
+                    const boxHeight = (lines.length * lineHeight) + (padding * 1.5);
+                    const boxX = (img.width - boxWidth) / 2;
+                    const boxY = img.height - boxHeight - (img.height * 0.12);
+                    const r = Math.min(24, boxHeight / 2);
+                    ctx.fillStyle = 'rgba(70, 60, 50, 0.85)';
+                    ctx.beginPath();
+                    ctx.moveTo(boxX + r, boxY); ctx.lineTo(boxX + boxWidth - r, boxY);
+                    ctx.quadraticCurveTo(boxX + boxWidth, boxY, boxX + boxWidth, boxY + r);
+                    ctx.lineTo(boxX + boxWidth, boxY + boxHeight - r);
+                    ctx.quadraticCurveTo(boxX + boxWidth, boxY + boxHeight, boxX + boxWidth - r, boxY + boxHeight);
+                    ctx.lineTo(boxX + r, boxY + boxHeight);
+                    ctx.quadraticCurveTo(boxX, boxY + boxHeight, boxX, boxY + boxHeight - r);
+                    ctx.lineTo(boxX, boxY + r);
+                    ctx.quadraticCurveTo(boxX, boxY, boxX + r, boxY);
+                    ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    let textY = boxY + padding + (fontSize / 2);
+                    for (const l of lines) { ctx.fillText(l.trim(), img.width / 2, textY); textY += lineHeight; }
+                    finalBase64 = canvas.toBuffer('image/jpeg', { quality: 0.95 }).toString('base64');
+                 }
+
+                 return await uploadToBlotato(`data:${mimeType.includes('image') ? 'image/jpeg' : mimeType};base64,${finalBase64}`);
+             }
+
              return mediaPath;
         };
 
         const finalMediaUrls = [];
-        if (video) finalMediaUrls.push(await processMedia(video));
-        else if (image) finalMediaUrls.push(await processMedia(image));
+        if (video) finalMediaUrls.push(await processMedia(video, true));
+        else if (image) finalMediaUrls.push(await processMedia(image, false));
+        // Filter out nulls
+        const cleanMediaUrls = finalMediaUrls.filter(Boolean) as string[];
 
-        // 3. Prepare exact schema as requested by API v2
-        // Blotato explicitly limits Hashtags to 5 for Instagram
+        // Hashtags — max 5 for Instagram, TikTok can have more
         let processedHashtags = '';
         if (hashtags) {
-            // Split by space or #, clean up, and slice to 5 max
             const tagsArray = hashtags.split(/[\s#]+/).filter(Boolean).map((t: string) => `#${t}`);
             processedHashtags = tagsArray.slice(0, 5).join(' ');
         }
 
         const finalText = `${caption ? caption.trim() : ''}\n\n${processedHashtags}`.trim();
 
-        // NOTE: We default to Instagram for Creator Studio MVP, passing data down directly
-        const postPayload = {
-            post: {
-                accountId: targetAccount.id,
-                content: {
-                    text: finalText,
-                    mediaUrls: finalMediaUrls,
-                    platform: "instagram"
-                },
-                target: {
-                    targetType: "instagram",
-                    mediaType: video ? "reel" : undefined // "reel" or "story". Undefined for photos.
-                }
+        // 3. Publish to each target platform
+        const results: any[] = [];
+
+        for (const platform of targetPlatforms) {
+            const account = platform === 'tiktok' ? tiktokAccount : instagramAccount;
+            if (!account) {
+                console.warn(`[Blotato Publisher] Skipping ${platform} — no account connected`);
+                results.push({ platform, success: false, error: `No ${platform} account connected` });
+                continue;
             }
-        };
 
-        const publishRes = await fetch('https://backend.blotato.com/v2/posts', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${blotatoApiKey}`,
-                'x-api-key': blotatoApiKey,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(postPayload)
-        });
+            const postPayload: any = {
+                post: {
+                    accountId: account.id,
+                    content: {
+                        text: finalText,
+                        mediaUrls: cleanMediaUrls,
+                        platform
+                    },
+                    target: platform === 'tiktok' ? {
+                        targetType: 'tiktok',
+                        privacyLevel: 'PUBLIC_TO_EVERYONE',
+                        isAiGenerated: true
+                    } : {
+                        targetType: 'instagram',
+                        mediaType: isVideoContent ? 'reel' : undefined
+                    }
+                }
+            };
 
-        if (!publishRes.ok) {
-             const postErr = await publishRes.text();
-             throw new Error(`Failed to publish post: ${postErr}`);
+            // Platform-specific draft/schedule behavior:
+            // TikTok: isDraft works → save as draft so user can add sound/text
+            // Instagram: isDraft NOT supported → schedule 1 hour out for videos so user can edit
+            if (platform === 'tiktok' && userWantsDraft) {
+                postPayload.isDraft = true;
+            } else if (platform === 'instagram' && userWantsDraft && !scheduledTime) {
+                // Schedule 1 hour from now — gives user time to edit in Instagram app
+                const oneHourLater = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+                postPayload.scheduledTime = scheduledTime || oneHourLater;
+                console.log(`[Blotato Publisher] Instagram doesn't support drafts — scheduling video for ${oneHourLater}`);
+            }
+            if (scheduledTime) postPayload.scheduledTime = scheduledTime;
+
+            const mode = postPayload.isDraft ? 'draft' : postPayload.scheduledTime ? `scheduled ${postPayload.scheduledTime}` : 'publish now';
+            console.log(`[Blotato Publisher] ${platform} (account: ${account.id}) → ${mode}`);
+
+            const publishRes = await fetch('https://backend.blotato.com/v2/posts', {
+                method: 'POST',
+                headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                body: JSON.stringify(postPayload)
+            });
+
+            if (!publishRes.ok) {
+                const postErr = await publishRes.text();
+                console.error(`[Blotato Publisher] ${platform} failed: ${postErr}`);
+                results.push({ platform, success: false, error: postErr });
+            } else {
+                const publishData = await publishRes.json();
+                console.log(`[Blotato Publisher] ${platform} success! ID: ${publishData.postSubmissionId || 'unknown'}`);
+                const resultEntry: any = { platform, success: true, postId: publishData.postSubmissionId };
+                if (postPayload.isDraft) resultEntry.mode = 'draft';
+                else if (postPayload.scheduledTime) resultEntry.mode = 'scheduled';
+                else resultEntry.mode = 'published';
+                results.push(resultEntry);
+            }
         }
 
-        const publishData = await publishRes.json();
-        console.log(`[Blotato Publisher] Success: POSTED LIVE! ID: ${publishData.postSubmissionId || 'unknown'}`);
-        
-        res.json({ success: true, publishedAt: new Date().toISOString(), platformPostId: publishData.postSubmissionId });
+        const anySuccess = results.some(r => r.success);
+        const summary = results.map(r => `${r.platform}: ${r.success ? r.mode : 'failed'}`).join(', ');
+        console.log(`[Blotato Publisher] Results: ${summary}`);
+
+        res.json({ success: anySuccess, results, publishedAt: new Date().toISOString(), isVideoContent });
     } catch (error: any) {
         console.error("[Blotato Publisher Error]", error.message);
         res.status(500).json({ error: error.message });
@@ -712,6 +840,35 @@ app.get('/api/drive/stats', (req, res) => {
     const photos = (db.prepare("SELECT COUNT(*) as c FROM drive_assets WHERE contentType = 'Photo'").get() as any).c;
     const videos = (db.prepare("SELECT COUNT(*) as c FROM drive_assets WHERE contentType = 'Video'").get() as any).c;
     res.json({ total, unused, queued, published, photos, videos });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Settings — stored in SQLite for local dev (matches Worker's user_settings table behavior)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_settings (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    data TEXT NOT NULL DEFAULT '{}'
+  );
+`);
+
+app.get('/api/settings', (req, res) => {
+  try {
+    const row = db.prepare('SELECT data FROM user_settings WHERE id = 1').get() as any;
+    res.json(row ? JSON.parse(row.data) : {});
+  } catch {
+    res.json({});
+  }
+});
+
+app.post('/api/settings', (req, res) => {
+  try {
+    const existing = db.prepare('SELECT data FROM user_settings WHERE id = 1').get() as any;
+    const current = existing ? JSON.parse(existing.data) : {};
+    const merged = { ...current, ...req.body };
+    db.prepare('INSERT OR REPLACE INTO user_settings (id, data) VALUES (1, ?)').run(JSON.stringify(merged));
+    res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

@@ -2,7 +2,7 @@
  * Migration script: SQLite (database.db) → Supabase PostgreSQL
  *
  * Usage:
- *   SUPABASE_URL=https://xxx.supabase.co SUPABASE_SERVICE_ROLE_KEY=xxx npx tsx scripts/migrate-to-supabase.ts
+ *   SUPABASE_URL=https://xxx.supabase.co SUPABASE_SERVICE_ROLE_KEY=xxx TARGET_USER_ID=xxx npx tsx scripts/migrate-to-supabase.ts
  *
  * This script:
  * 1. Reads all personas and days from the local SQLite database
@@ -19,12 +19,12 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const TARGET_USER_ID = process.env.TARGET_USER_ID; // The Supabase user ID to assign data to
+const TARGET_USER_ID = process.env.TARGET_USER_ID;
 
 if (!SUPABASE_URL || !SUPABASE_KEY || !TARGET_USER_ID) {
-  console.error('Required env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TARGET_USER_ID');
+  console.error('Required env vars: SUPABASE_URL (or VITE_SUPABASE_URL), SUPABASE_SERVICE_ROLE_KEY, TARGET_USER_ID');
   process.exit(1);
 }
 
@@ -53,21 +53,12 @@ async function migratePersonas() {
       eyes: p.appearance?.eyes || null,
       hair: p.appearance?.hair || null,
       distinct_features: p.appearance?.distinctFeatures || [],
-      core_traits: p.psychographic?.coreTraits || [],
-      interests: p.psychographic?.interests || [],
-      values: p.psychographic?.values || [],
-      fears: p.psychographic?.fears || [],
-      motivations: p.psychographic?.motivations || [],
-      mission: p.psychographic?.mission || null,
+      // JSONB columns — store the nested objects as-is
+      psychographic: p.psychographic || {},
       backstory: p.backstory || null,
-      aesthetic: p.fashionStyle?.aesthetic || null,
-      signature_items: p.fashionStyle?.signatureItems || [],
-      photography_style: p.fashionStyle?.photographyStyle || null,
-      routine: p.lifestyle?.routine || null,
-      diet: p.lifestyle?.diet || null,
-      pet: p.lifestyle?.pet || null,
-      social_media_presence: p.lifestyle?.socialMediaPresence || null,
-      social_handles: p.socialHandles || null,
+      fashion_style: p.fashionStyle || {},
+      lifestyle: p.lifestyle || {},
+      social_handles: p.socialHandles || {},
       reference_image_url: p.referenceImageUrl || null,
       reference_image_urls: p.referenceImageUrls || [],
       ai_analysis: p.aiAnalysis || null,
@@ -85,15 +76,36 @@ async function migrateDays() {
   console.log('📅 Migrating content days...');
   const rows = db.prepare('SELECT id, personaId, data FROM days').all() as any[];
 
+  // Normalize content types that don't match the enum
+  const validContentTypes = new Set(['Photo', 'Carousel', 'Video']);
+  const validStatuses = new Set(['draft', 'generating', 'completed', 'published']);
+
   for (const row of rows) {
     const d = JSON.parse(row.data);
+
+    let contentType = d.contentType || 'Photo';
+    if (!validContentTypes.has(contentType)) {
+      contentType = contentType === 'Reel' ? 'Video' : 'Photo';
+    }
+
+    let status = d.status || 'draft';
+    if (!validStatuses.has(status)) {
+      status = 'draft';
+    }
+
+    // Normalize platforms — "Both" → ["Instagram", "TikTok"]
+    let platforms = d.platforms || ['Instagram'];
+    platforms = platforms.flatMap((p: string) =>
+      p === 'Both' ? ['Instagram', 'TikTok'] : [p]
+    );
+
     const { error } = await supabase.from('days').upsert({
       id: d.id,
       user_id: TARGET_USER_ID,
       persona_id: d.personaId,
       day_number: d.dayNumber || 1,
       date: d.date || null,
-      platforms: d.platforms || ['Instagram'],
+      platforms,
       theme: d.theme || null,
       scene_description: d.sceneDescription || null,
       on_screen_text: d.onScreenText || null,
@@ -104,8 +116,8 @@ async function migrateDays() {
       location: d.location || null,
       music_suggestion: d.musicSuggestion || null,
       notes: d.notes || null,
-      content_type: d.contentType || 'Photo',
-      status: d.status || 'draft',
+      content_type: contentType,
+      status,
       generated_image_url: d.generatedImageUrl || null,
       generated_video_url: d.generatedVideoUrl || null,
       custom_media_url: d.customMediaUrl || null,
@@ -114,8 +126,8 @@ async function migrateDays() {
       is_ai_generated: d.isAIGenerated || false,
       style_option: d.styleOption || null,
       hairstyle: d.hairstyle || null,
-      post_image_references: d.postImageReferences || null,
-      slides: d.slides || null,
+      post_image_references: d.postImageReferences || [],
+      slides: d.slides || [],
     });
 
     if (error) {
@@ -150,7 +162,16 @@ async function migrateDriveAssets() {
   console.log('📁 Migrating drive assets...');
   const rows = db.prepare('SELECT * FROM drive_assets').all() as any[];
 
+  const validContentTypes = new Set(['Photo', 'Carousel', 'Video']);
+  const validStatuses = new Set(['unused', 'linked', 'archived']);
+
   for (const row of rows) {
+    let contentType = row.contentType || 'Photo';
+    if (!validContentTypes.has(contentType)) contentType = 'Photo';
+
+    let status = row.status || 'unused';
+    if (!validStatuses.has(status)) status = 'unused';
+
     const { error } = await supabase.from('drive_assets').upsert({
       id: row.id,
       user_id: TARGET_USER_ID,
@@ -160,8 +181,8 @@ async function migrateDriveAssets() {
       file_size: row.fileSize,
       drive_url: row.driveUrl,
       thumbnail_url: row.thumbnailUrl,
-      content_type: row.contentType || 'Photo',
-      status: row.status || 'unused',
+      content_type: contentType,
+      status,
       linked_day_id: row.linkedDayId || null,
       synced_at: new Date(row.syncedAt).toISOString(),
     });

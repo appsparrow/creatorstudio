@@ -40,6 +40,7 @@ import { ContentDay, Persona } from './types';
 import { getAiInstance, GENERATION_MODEL } from './services/ai';
 import { generateImageNanoBanana } from './services/nanobanana';
 import { generateVideoKling } from './services/kling';
+import { fetchPersonas, savePersona, deletePersona as deletePersonaApi, fetchDays, saveDay, deleteDay as deleteDayApi, saveImage, generateVideo, checkVideoStatus, saveVideo, publishToBlotato, syncDriveFiles, updateDriveAsset, fetchUserSettings, saveUserSettings } from './services/api';
 
 const formatGoogleDriveUrl = (url: string) => {
     if (!url) return url;
@@ -290,12 +291,10 @@ export default function App() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const pre = await fetch('/api/personas');
-        const pData = await pre.json();
-        if (pData.length > 0) setPersonas(pData); else fetch('/api/personas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(SOFIA_PERSONA) });
+        const pData = await fetchPersonas();
+        if (pData.length > 0) setPersonas(pData); else savePersona(SOFIA_PERSONA);
 
-        const dre = await fetch('/api/days');
-        const dData = await dre.json();
+        const dData = await fetchDays();
         if (dData.length > 0) {
           setDays(dData);
           if (dData[0]) setSelectedDayId(dData[0].id);
@@ -311,7 +310,7 @@ export default function App() {
            const init = INITIAL_DAY(SOFIA_PERSONA.id);
            setDays([init]);
            setSelectedDayId(init.id);
-           fetch('/api/days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(init) });
+           saveDay(init);
         }
       } catch (e) {
         console.error("DB Fetch Error:", e);
@@ -371,26 +370,17 @@ export default function App() {
                    const finalImage = mapUrl(postDay.generatedImageUrl);
                    const isVideo = !!(finalVideo && (postDay.contentType === 'Video' || postDay.generatedVideoUrl || postDay.customMediaUrl));
 
-                   const res = await fetch('/api/blotato/publish', {
-                       method: 'POST',
-                       headers: { 'Content-Type': 'application/json' },
-                       body: JSON.stringify({
-                           image: isVideo ? undefined : finalImage,
-                           video: isVideo ? finalVideo : undefined,
-                           onScreenText: postDay.onScreenText,
-                           caption: postDay.caption,
-                           hashtags: postDay.hashtags,
-                           contentType: isVideo ? 'Video' : postDay.contentType,
-                           blotatoApiKey,
-                           dayId: postDay.id
-                       })
+                   await publishToBlotato({
+                       image: isVideo ? undefined : finalImage,
+                       video: isVideo ? finalVideo : undefined,
+                       caption: postDay.caption,
+                       hashtags: postDay.hashtags,
+                       contentType: isVideo ? 'Video' : postDay.contentType,
+                       blotatoApiKey,
+                       dayId: postDay.id
                    });
-                   if (res.ok) {
-                       updateDay(postDay.id, { status: 'published' });
-                       console.log(`[Auto-Cron] Published successfully at slot ${currentHHMM}.`);
-                   } else {
-                       console.error(`[Auto-Cron] Blotato rejected post at slot ${currentHHMM}`);
-                   }
+                   updateDay(postDay.id, { status: 'published' });
+                   console.log(`[Auto-Cron] Published successfully at slot ${currentHHMM}.`);
                } catch (e) {
                    console.error(`[Auto-Cron] Network failure at slot ${currentHHMM}`, e);
                }
@@ -412,7 +402,7 @@ export default function App() {
     setDays(prev => {
       const updated = prev.map(d => d.id === id ? { ...d, ...updates } : d);
       const current = updated.find(d => d.id === id);
-      if (current) fetch('/api/days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(current) });
+      if (current) saveDay(current);
       return updated;
     });
   };
@@ -487,11 +477,7 @@ export default function App() {
         try {
             // Save each day to backend database
             for (const day of newDays) {
-                await fetch('/api/days', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(day)
-                });
+                await saveDay(day);
             }
         } catch (e) {
             console.error("Failed to save imported days to DB:", e);
@@ -581,7 +567,7 @@ export default function App() {
         status: 'draft'
       };
       // Save immediately to DB
-      fetch('/api/days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newDay) });
+      saveDay(newDay);
 
       setDays([...days, newDay]);
       setSelectedDayId(newDay.id);
@@ -611,7 +597,7 @@ export default function App() {
       }
     }
 
-    fetch('/api/days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newDay) });
+    saveDay(newDay);
     setDays([...days, newDay]);
     setSelectedDayId(newDay.id);
   };
@@ -619,7 +605,7 @@ export default function App() {
 
   const deleteDay = (id: string) => {
     if (days.length === 1) return;
-    fetch(`/api/days/${id}`, { method: 'DELETE' });
+    deleteDayApi(id);
     const newDays = days.filter(d => d.id !== id);
     setDays(newDays);
     if (selectedDayId === id) {
@@ -633,11 +619,7 @@ export default function App() {
     newPersona.id = `persona_${newPersona.id.substring(0,8)}`; // Give a clean readable namespace for local fs mapping
     
     // Immediately scaffold the persona into SQLite and build its dedicated folder on the server
-    await fetch('/api/personas', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(newPersona) 
-    });
+    await savePersona(newPersona);
 
     setPersonas([...personas, newPersona]);
     setSelectedPersonaId(newPersona.id);
@@ -650,19 +632,19 @@ export default function App() {
     }
     if (!window.confirm("Are you sure you want to delete this persona and all of its associated days?")) return;
     
-    fetch(`/api/personas/${id}`, { method: 'DELETE' });
+    deletePersonaApi(id);
     const newPersonas = personas.filter(p => p.id !== id);
     setPersonas(newPersonas);
     const newDays = days.filter(d => d.personaId !== id);
     setDays(newDays);
-    
+
     const nextPersonaId = newPersonas[0].id;
     setSelectedPersonaId(nextPersonaId);
     if (!newDays.some(d => d.personaId === nextPersonaId)) {
       const init = INITIAL_DAY(nextPersonaId);
       setDays([...newDays, init]);
       setSelectedDayId(init.id);
-      fetch('/api/days', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(init) });
+      saveDay(init);
     } else {
       setSelectedDayId(newDays.find(d => d.personaId === nextPersonaId)?.id || newDays[0].id);
     }
@@ -861,12 +843,7 @@ export default function App() {
 
     // Save to Server
     const filename = `${generateUUID()}.png`;
-    const savedResp = await fetch('/api/images/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64: compositedBase64, filename, personaId: personaIdOverride || selectedPersona.id })
-    });
-    const savedData = await savedResp.json();
+    const savedData = await saveImage(compositedBase64, filename, personaIdOverride || selectedPersona.id);
     return savedData.url;
   };
 
@@ -951,31 +928,21 @@ export default function App() {
               const randomAngle = VIDEO_HOOK_ANGLES[Math.floor(Math.random() * VIDEO_HOOK_ANGLES.length)];
               console.log("[App] Requesting Kling Video via Proxy for angle:", randomAngle);
               
-              const resp = await fetch('/api/videos/generate', {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify({
-                    prompt: `Animate this scene naturally for 5 seconds. Camera Frame Angle: ${randomAngle}. Scene: ${selectedDay.sceneDescription}`,
-                    image_url: publicImageUrl,
-                    apiKey: klingApiKey,
-                    apiSecret: klingApiSecret,
-                    model_name: klingVariant,
-                    publicTunnelUrl: publicTunnelUrl,
-                    dayId: selectedDayId
-                 })
+              const vData = await generateVideo({
+                 prompt: `Animate this scene naturally for 5 seconds. Camera Frame Angle: ${randomAngle}. Scene: ${selectedDay.sceneDescription}`,
+                 image_url: publicImageUrl,
+                 apiKey: klingApiKey,
+                 apiSecret: klingApiSecret,
+                 model_name: klingVariant,
+                 publicTunnelUrl: publicTunnelUrl,
+                 dayId: selectedDayId
               });
-              const respText = await resp.text();
-              console.log("[Kling Proxy Raw]:", respText);
-              
-              try {
-                  const vData = JSON.parse(respText);
-                  if (vData.url) {
-                      finalVideoUrl = vData.url;
-                  } else if (vData.error) {
-                      throw new Error(vData.error);
-                  }
-              } catch (parseErr) {
-                  throw new Error(`Kling Proxy Failed: ${respText.slice(0, 500)}... Check server logs for details.`);
+              console.log("[Kling Proxy Raw]:", JSON.stringify(vData));
+
+              if ((vData as any).url) {
+                  finalVideoUrl = (vData as any).url;
+              } else if ((vData as any).error) {
+                  throw new Error((vData as any).error);
               }
            } catch (e: any) {
               console.error("Kling Video Failed:", e);
@@ -1011,82 +978,66 @@ export default function App() {
         
         console.log("[App] Requesting Kling Video Only via Proxy for angle:", randomAngle);
         
-        const resp = await fetch('/api/videos/generate', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({
-              prompt: `Animate this scene naturally for 5 seconds. ${day.sceneDescription ? `Scene: ${day.sceneDescription}.` : ''} ${day.caption ? `Context: ${day.caption.slice(0, 200)}.` : ''} Camera angle: ${randomAngle}. Keep the subject's expression and mood consistent with the image.`,
-              image_url: publicImageUrl,
-              apiKey: klingApiKey,
-              apiSecret: klingApiSecret,
-              model_name: klingVariant,
-              publicTunnelUrl: publicTunnelUrl,
-              dayId: dayId
-           })
-        });
-        const respText = await resp.text();
-        console.log("[Kling Proxy Only Raw]:", respText);
-        
+        let vData: any;
         try {
-            const vData = JSON.parse(respText);
-            if (vData.taskId) {
-                console.log("[App] Task ID Submitted successfully:", vData.taskId);
-                
-                let attempts = 0;
-                const maxAttempts = 100;
-                while (attempts < maxAttempts) {
-                    await new Promise(r => setTimeout(r, 10000)); // wait 10s
-                    attempts++;
-                    
-                    console.log(`[App] Polling Task ${vData.taskId} ... Attempt ${attempts}/${maxAttempts}`);
-                    // Update day to store actual taskId for status restoration
-                    if (attempts === 1) updateDay(dayId, { pendingVideoTaskId: vData.taskId });
-                    
-                    const statusResp = await fetch(`/api/videos/status/${vData.taskId}`, {
-                         headers: { 
-                             'x-api-key': klingApiKey, 
-                             'x-api-secret': klingApiSecret 
-                         }
-                    });
-                    const statusData = await statusResp.json();
-                    console.log("[App] Polling status reply:", JSON.stringify(statusData));
-                    const status = statusData.task_status;
-                    const videoUrl = statusData.video_url;
-
-                     if (status === 'processing') {
-                         setVideoStatus(s => ({ ...s, [dayId]: 'processing' }));
-                     }
-                    if (status === 'succeed') {
-                         console.log("[App] Success! Saving video to local downloads folder...");
-                         if (!videoUrl) throw new Error("Video success but no URL returned from Kling.");
-
-                         const saveResp = await fetch('/api/videos/save', {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify({ videoUrl, personaId: day.personaId })
-                         });
-                         const saveResult = await saveResp.json();
-                         if (saveResult.url) {
-                             setVideoStatus(s => ({ ...s, [dayId]: 'done' }));
-                             updateDay(dayId, { generatedVideoUrl: saveResult.url, pendingVideoTaskId: undefined });
-                             return;
-                         } else {
-                             throw new Error("Failed to save final file locally.");
-                         }
-                    } else if (status === 'failed') {
-                         setVideoStatus(s => ({ ...s, [dayId]: 'failed' }));
-                         throw new Error(`Kling Task Failed. Check Kling dashboard.`);
-                    }
-                    // status is 'submitted' or 'processing' - keep polling
-                }
-                throw new Error("Task timed out after 16 minutes. The video may still be processing in Kling dashboard.");
-            } else if (vData.error) {
-                throw new Error(vData.error);
-            } else {
-                throw new Error(`Kling starting failed: ${respText.slice(0,200)}`);
-            }
+            vData = await generateVideo({
+               prompt: `Animate this scene naturally for 5 seconds. ${day.sceneDescription ? `Scene: ${day.sceneDescription}.` : ''} ${day.caption ? `Context: ${day.caption.slice(0, 200)}.` : ''} Camera angle: ${randomAngle}. Keep the subject's expression and mood consistent with the image.`,
+               image_url: publicImageUrl,
+               apiKey: klingApiKey,
+               apiSecret: klingApiSecret,
+               model_name: klingVariant,
+               publicTunnelUrl: publicTunnelUrl,
+               dayId: dayId
+            });
         } catch (parseErr: any) {
-            throw new Error(`Kling Proxy Failed: ${parseErr.message || respText.slice(0, 500)}`);
+            throw new Error(`Kling Proxy Failed: ${parseErr.message}`);
+        }
+        console.log("[Kling Proxy Only Raw]:", JSON.stringify(vData));
+
+        if (vData.taskId) {
+            console.log("[App] Task ID Submitted successfully:", vData.taskId);
+
+            let attempts = 0;
+            const maxAttempts = 100;
+            while (attempts < maxAttempts) {
+                await new Promise(r => setTimeout(r, 10000)); // wait 10s
+                attempts++;
+
+                console.log(`[App] Polling Task ${vData.taskId} ... Attempt ${attempts}/${maxAttempts}`);
+                // Update day to store actual taskId for status restoration
+                if (attempts === 1) updateDay(dayId, { pendingVideoTaskId: vData.taskId });
+
+                const statusData = await checkVideoStatus(vData.taskId, klingApiKey, klingApiSecret);
+                console.log("[App] Polling status reply:", JSON.stringify(statusData));
+                const status = (statusData as any).task_status;
+                const videoUrl = (statusData as any).video_url;
+
+                if (status === 'processing') {
+                    setVideoStatus(s => ({ ...s, [dayId]: 'processing' }));
+                }
+                if (status === 'succeed') {
+                    console.log("[App] Success! Saving video to local downloads folder...");
+                    if (!videoUrl) throw new Error("Video success but no URL returned from Kling.");
+
+                    const saveResult = await saveVideo(videoUrl, day.personaId);
+                    if (saveResult.url) {
+                        setVideoStatus(s => ({ ...s, [dayId]: 'done' }));
+                        updateDay(dayId, { generatedVideoUrl: saveResult.url, pendingVideoTaskId: undefined });
+                        return;
+                    } else {
+                        throw new Error("Failed to save final file locally.");
+                    }
+                } else if (status === 'failed') {
+                    setVideoStatus(s => ({ ...s, [dayId]: 'failed' }));
+                    throw new Error(`Kling Task Failed. Check Kling dashboard.`);
+                }
+                // status is 'submitted' or 'processing' - keep polling
+            }
+            throw new Error("Task timed out after 16 minutes. The video may still be processing in Kling dashboard.");
+        } else if (vData.error) {
+            throw new Error(vData.error);
+        } else {
+            throw new Error(`Kling starting failed: ${JSON.stringify(vData).slice(0,200)}`);
         }
     } catch (e: any) {
         console.error("Kling Video Only Failed:", e);
@@ -1450,16 +1401,7 @@ export default function App() {
                                    const reader = new FileReader();
                                    reader.onloadend = async () => {
                                       const base64 = reader.result as string;
-                                      const resp = await fetch('/api/images/save', {
-                                         method: 'POST',
-                                         headers: { 'Content-Type': 'application/json' },
-                                         body: JSON.stringify({ 
-                                           base64, 
-                                           filename: `persona_${selectedPersonaId}_${i}_${Date.now()}.png`,
-                                           personaId: selectedPersonaId
-                                         })
-                                      });
-                                      const data = await resp.json();
+                                      const data = await saveImage(base64, `persona_${selectedPersonaId}_${i}_${Date.now()}.png`, selectedPersonaId);
                                       const newPersonas = [...personas];
                                       const idx = newPersonas.findIndex(p => p.id === selectedPersonaId);
                                       const urls = [...(newPersonas[idx].referenceImageUrls || [])];
@@ -1542,11 +1484,7 @@ export default function App() {
                 <button 
                   onClick={async () => {
                     try {
-                      await fetch('/api/personas', { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify(selectedPersona) 
-                      });
+                      await savePersona(selectedPersona);
                       setIsPersonaModalOpen(false);
                     } catch (e) {
                       console.error("Failed to save persona:", e);
@@ -1692,13 +1630,7 @@ export default function App() {
                       const url = localStorage.getItem('drive_folder_url');
                       if (!url) return alert('Set your Google Drive folder URL in Settings first!');
                       try {
-                        const res = await fetch('/api/drive/list', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ folderUrl: url })
-                        });
-                        if (!res.ok) throw new Error(await res.text());
-                        const data = await res.json();
+                        const data = await syncDriveFiles(url);
                         setDriveFiles(data.files || []);
                       } catch (e: any) { return alert(`Failed to load Drive files: ${e.message}`); }
                     }
@@ -1775,11 +1707,7 @@ export default function App() {
                           });
                         }
                         // Mark asset as queued in DB
-                        fetch(`/api/drive/assets/${file.id}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ status: 'queued', linkedDayId: selectedDay.id })
-                        }).catch(() => {});
+                        updateDriveAsset(file.id, { status: 'queued', linkedDayId: selectedDay.id }).catch(() => {});
                         setShowDrivePicker(false);
                       }}
                       className="group relative aspect-square rounded-xl overflow-hidden border-2 border-zinc-100 hover:border-black transition-all bg-zinc-100"
@@ -2245,13 +2173,7 @@ export default function App() {
                             if (!driveFolderUrl) return alert('Enter a Google Drive folder URL first');
                             setIsDriveSyncing(true);
                             try {
-                              const res = await fetch('/api/drive/list', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ folderUrl: driveFolderUrl })
-                              });
-                              if (!res.ok) throw new Error(await res.text());
-                              const data = await res.json();
+                              const data = await syncDriveFiles(driveFolderUrl);
                               setDriveFiles(data.files || []);
                               alert(`Synced ${data.files?.length || 0} files from Google Drive!`);
                             } catch (e: any) { alert(`Drive sync failed: ${e.message}`); }
@@ -2892,7 +2814,7 @@ export default function App() {
 
                             <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                               {selectedDay.contentType === 'Video' && selectedDay.generatedImageUrl && !selectedDay.generatedVideoUrl && (
-                                <button 
+                                <button
                                   onClick={(e) => { e.stopPropagation(); generateVideoOnly(selectedDay.id); }}
                                   className="p-2 rounded-full shadow-lg backdrop-blur-md bg-white/80 text-zinc-700 hover:bg-black hover:text-white transition-all"
                                   title="Generate Video from this Image"
@@ -2900,6 +2822,24 @@ export default function App() {
                                   <Video className="w-5 h-5 flex-shrink-0" />
                                 </button>
                               )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Remove all media (image & video) from this post? This cannot be undone.')) {
+                                    updateDay(selectedDay.id, {
+                                      generatedImageUrl: undefined,
+                                      generatedVideoUrl: undefined,
+                                      customMediaUrl: undefined,
+                                      pendingVideoTaskId: undefined,
+                                      status: 'draft'
+                                    });
+                                  }
+                                }}
+                                className="p-2 rounded-full shadow-lg backdrop-blur-md bg-red-500/80 text-white hover:bg-red-600 transition-all"
+                                title="Remove media from this post"
+                              >
+                                <Trash2 className="w-5 h-5 flex-shrink-0" />
+                              </button>
                               <button 
                                 onClick={async (e) => {
                                    e.stopPropagation();
@@ -2935,7 +2875,8 @@ export default function App() {
                               >
                                 <CheckCircle2 className="w-5 h-5" />
                               </button>
-                              <button 
+                              {/* Publish button — videos default to draft, photos publish live with text */}
+                              <button
                                 onClick={async (e) => {
                                    e.stopPropagation();
                                    if (!blotatoApiKey) return alert("Configure your Blotato API Key in Settings first!");
@@ -2945,38 +2886,42 @@ export default function App() {
                                       const cleanUrl = publicTunnelUrl.endsWith('/') ? publicTunnelUrl.slice(0, -1) : publicTunnelUrl;
                                       const mapUrl = (u?: string) => u?.startsWith('/') ? `${cleanUrl}${u}` : u;
 
-                                      // Resolve final media: customMediaUrl overrides, video takes priority over image
                                       const customUrl = selectedDay.customMediaUrl ? formatGoogleDriveUrl(selectedDay.customMediaUrl) : undefined;
                                       const finalVideo = customUrl || mapUrl(selectedDay.generatedVideoUrl);
                                       const finalImage = finalVideo ? undefined : mapUrl(selectedDay.generatedImageUrl);
                                       const isVideo = !!(finalVideo && (selectedDay.contentType === 'Video' || selectedDay.generatedVideoUrl || selectedDay.customMediaUrl));
 
-                                      // Tell Blotato to post
-                                      const res = await fetch('/api/blotato/publish', {
-                                         method: 'POST',
-                                         headers: { 'Content-Type': 'application/json' },
-                                         body: JSON.stringify({
-                                            image: isVideo ? undefined : (finalImage || mapUrl(selectedDay.generatedImageUrl)),
-                                            video: isVideo ? finalVideo : undefined,
-                                            caption: selectedDay.caption,
-                                            hashtags: selectedDay.hashtags,
-                                            onScreenText: selectedDay.onScreenText,
-                                            contentType: isVideo ? 'Video' : selectedDay.contentType,
-                                            blotatoApiKey,
-                                            dayId: selectedDay.id
-                                         })
+                                      // Send to both Instagram + TikTok based on day's platforms
+                                      const pubPlatforms = selectedDay.platforms.map(p => p.toLowerCase()).filter(p => p === 'instagram' || p === 'tiktok');
+                                      if (pubPlatforms.length === 0) pubPlatforms.push('instagram');
+
+                                      const data = await publishToBlotato({
+                                         image: isVideo ? undefined : (finalImage || mapUrl(selectedDay.generatedImageUrl)),
+                                         video: isVideo ? finalVideo : undefined,
+                                         caption: selectedDay.caption,
+                                         hashtags: selectedDay.hashtags,
+                                         contentType: isVideo ? 'Video' : selectedDay.contentType,
+                                         blotatoApiKey,
+                                         dayId: selectedDay.id,
+                                         // isDraft not set — server defaults: video→draft, photo→publish
                                       });
-                                      if (res.ok) {
-                                        alert("Published successfully via Blotato!");
-                                        updateDay(selectedDay.id, { status: 'published' });
-                                      } else {
-                                        const errorData = await res.json();
-                                        throw new Error(errorData.error || "API Post failed");
-                                      }
-                                   } catch (e: any) { alert(`Failed to publish to Blotato: ${e.message}`); }
+                                      const summary = ((data as any).results || []).map((r: any) =>
+                                        `${r.platform}: ${r.success ? r.mode || 'done' : 'failed'}`
+                                      ).join('\n');
+                                      const hasScheduled = (data as any).results?.some((r: any) => r.mode === 'scheduled');
+                                      const hasDraft = (data as any).results?.some((r: any) => r.mode === 'draft');
+                                      alert(
+                                        hasScheduled
+                                          ? `Video scheduled on Instagram (1 hr) — edit in app to add sound & text before it posts\n\n${summary}`
+                                          : hasDraft
+                                          ? `Saved as TikTok draft — open TikTok app notifications to edit\n\n${summary}`
+                                          : `Published!\n\n${summary}`
+                                      );
+                                      updateDay(selectedDay.id, { status: 'published' });
+                                   } catch (e: any) { alert(`Failed: ${e.message}`); }
                                 }}
                                 className="p-2 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all"
-                                title="Publish Direct to Channels (Blotato)"
+                                title="Publish (videos → draft, photos → live with text)"
                               >
                                 <Send className="w-5 h-5" />
                               </button>

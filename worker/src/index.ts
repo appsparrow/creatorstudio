@@ -3,39 +3,22 @@
  * Framework : Hono 4.x
  * Database  : Supabase (Postgres + RLS + Storage)
  *
- * Replaces the local Express + SQLite server.ts.
- *
  * Auth model
  * ----------
  * Every route except POST /api/videos/callback requires a valid Supabase
  * user JWT in `Authorization: Bearer <token>`.  We forward that token to
- * the Supabase JS client so RLS policies run as the authenticated user —
- * no manual user_id filters needed in SQL.
+ * the Supabase JS client so RLS policies run as the authenticated user.
  *
  * The callback webhook uses the service-role key (bypasses RLS) because
  * Kling calls it directly with no user context.
  *
- * Kling JWT
- * ---------
- * The original server used Node's `crypto.createHmac`.  Workers ship the
- * Web Crypto API (crypto.subtle) instead.  We implement HS256 signing with
- * SubtleCrypto.importKey + SubtleCrypto.sign.
+ * Schema
+ * ------
+ * All tables use normalized columns — no `data` JSONB blobs.
+ * Conversion between frontend camelCase and DB snake_case is handled by
+ * personaToDb / dbToPersona / dayToDb / dbToDay.
  *
- * Canvas text overlay
- * -------------------
- * Removed from this server (no canvas/node-canvas in Workers).
- * The browser applies text overlays before calling POST /api/blotato/publish.
- *
- * Required Supabase tables (run the migration at the bottom of this file)
- * -----------------------------------------------------------------------
- *   personas      — id uuid, user_id uuid, data jsonb
- *   days          — id uuid, persona_id uuid, user_id uuid, data jsonb
- *   video_tasks   — task_id text, day_id uuid, user_id uuid, created_at timestamptz
- *   drive_assets  — see migration below
- *
- * Required Supabase Storage bucket
- * ----------------------------------
- *   uploads  — public bucket (or private with signed URLs — your call)
+ * Storage: Cloudflare R2 bucket 'creatorstudio-media'
  */
 
 import { Hono } from 'hono';
@@ -50,9 +33,260 @@ interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
-  /** Google Drive API key (falls back to GEMINI_API_KEY if unset) */
   DRIVE_API_KEY: string;
   GEMINI_API_KEY: string;
+  MEDIA_BUCKET: R2Bucket;
+  R2_PUBLIC_URL: string;
+}
+
+// ---------------------------------------------------------------------------
+// Frontend TypeScript types (what the API receives / returns)
+// ---------------------------------------------------------------------------
+
+interface PersonaIdentity {
+  fullName: string;
+  age: number;
+  gender: string;
+  nationality: string;
+  birthplace: string;
+  profession: string;
+  locations: string[];
+}
+
+interface PersonaAppearance {
+  height: string;
+  bodyType: string;
+  faceShape: string;
+  eyes: string;
+  hair: string;
+  distinctFeatures: string[];
+}
+
+interface PersonaPsychographic {
+  coreTraits: string[];
+  interests: string[];
+  values: string[];
+  fears: string[];
+  motivations: string[];
+  mission: string;
+}
+
+interface PersonaFashionStyle {
+  aesthetic: string;
+  signatureItems: string[];
+  photographyStyle: string;
+}
+
+interface PersonaLifestyle {
+  routine: string;
+  diet: string;
+  pet?: string;
+  socialMediaPresence: string;
+}
+
+interface PersonaSocialHandles {
+  instagram?: string;
+  tiktok?: string;
+  youtube?: string;
+  twitter?: string;
+  x?: string;
+}
+
+interface Persona {
+  id: string;
+  identity: PersonaIdentity;
+  appearance: PersonaAppearance;
+  psychographic: PersonaPsychographic;
+  backstory: string;
+  fashionStyle: PersonaFashionStyle;
+  lifestyle: PersonaLifestyle;
+  socialHandles?: PersonaSocialHandles;
+  referenceImageUrl?: string;
+  referenceImageUrls?: string[];
+  aiAnalysis?: string;
+}
+
+interface ContentDay {
+  id: string;
+  dayNumber: number;
+  date: string;
+  platforms: string[];
+  theme: string;
+  sceneDescription: string;
+  onScreenText: string;
+  caption: string;
+  hook: string;
+  hashtags: string;
+  cta: string;
+  location: string;
+  musicSuggestion: string;
+  notes: string;
+  contentType: 'Photo' | 'Carousel' | 'Video';
+  generatedImageUrl?: string;
+  generatedVideoUrl?: string;
+  customMediaUrl?: string;
+  pendingVideoTaskId?: string;
+  status: 'draft' | 'generating' | 'completed' | 'published';
+  personaId: string;
+  styleOption?: string;
+  isAIGenerated?: boolean;
+  isGoodToPost?: boolean;
+  postImageReferences?: unknown[];
+  slides?: unknown[];
+  hairstyle?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Conversion: Persona ↔ DB row
+// ---------------------------------------------------------------------------
+
+function personaToDb(persona: Persona, userId: string): Record<string, unknown> {
+  return {
+    id: persona.id,
+    user_id: userId,
+    full_name: persona.identity?.fullName ?? null,
+    age: persona.identity?.age ?? null,
+    gender: persona.identity?.gender ?? null,
+    nationality: persona.identity?.nationality ?? null,
+    birthplace: persona.identity?.birthplace ?? null,
+    profession: persona.identity?.profession ?? null,
+    locations: persona.identity?.locations ?? null,
+    height: persona.appearance?.height ?? null,
+    body_type: persona.appearance?.bodyType ?? null,
+    face_shape: persona.appearance?.faceShape ?? null,
+    eyes: persona.appearance?.eyes ?? null,
+    hair: persona.appearance?.hair ?? null,
+    distinct_features: persona.appearance?.distinctFeatures ?? null,
+    psychographic: persona.psychographic ?? null,
+    backstory: persona.backstory ?? null,
+    fashion_style: persona.fashionStyle ?? null,
+    lifestyle: persona.lifestyle ?? null,
+    social_handles: persona.socialHandles ?? null,
+    reference_image_url: persona.referenceImageUrl ?? null,
+    reference_image_urls: persona.referenceImageUrls ?? null,
+    ai_analysis: persona.aiAnalysis ?? null,
+  };
+}
+
+function dbToPersona(row: Record<string, unknown>): Persona {
+  const psychographic = (row.psychographic as PersonaPsychographic | null) ?? {
+    coreTraits: [],
+    interests: [],
+    values: [],
+    fears: [],
+    motivations: [],
+    mission: '',
+  };
+
+  const fashionStyle = (row.fashion_style as PersonaFashionStyle | null) ?? {
+    aesthetic: '',
+    signatureItems: [],
+    photographyStyle: '',
+  };
+
+  const lifestyle = (row.lifestyle as PersonaLifestyle | null) ?? {
+    routine: '',
+    diet: '',
+    socialMediaPresence: '',
+  };
+
+  return {
+    id: row.id as string,
+    identity: {
+      fullName: (row.full_name as string) ?? '',
+      age: (row.age as number) ?? 0,
+      gender: (row.gender as string) ?? '',
+      nationality: (row.nationality as string) ?? '',
+      birthplace: (row.birthplace as string) ?? '',
+      profession: (row.profession as string) ?? '',
+      locations: (row.locations as string[]) ?? [],
+    },
+    appearance: {
+      height: (row.height as string) ?? '',
+      bodyType: (row.body_type as string) ?? '',
+      faceShape: (row.face_shape as string) ?? '',
+      eyes: (row.eyes as string) ?? '',
+      hair: (row.hair as string) ?? '',
+      distinctFeatures: (row.distinct_features as string[]) ?? [],
+    },
+    psychographic,
+    backstory: (row.backstory as string) ?? '',
+    fashionStyle,
+    lifestyle,
+    socialHandles: (row.social_handles as PersonaSocialHandles | undefined) ?? undefined,
+    referenceImageUrl: (row.reference_image_url as string | undefined) ?? undefined,
+    referenceImageUrls: (row.reference_image_urls as string[] | undefined) ?? undefined,
+    aiAnalysis: (row.ai_analysis as string | undefined) ?? undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Conversion: ContentDay ↔ DB row
+// ---------------------------------------------------------------------------
+
+function dayToDb(day: ContentDay, userId: string): Record<string, unknown> {
+  return {
+    id: day.id,
+    user_id: userId,
+    persona_id: day.personaId,
+    day_number: day.dayNumber ?? null,
+    date: day.date ?? null,
+    platforms: day.platforms ?? null,
+    content_type: day.contentType ?? null,
+    theme: day.theme ?? null,
+    scene_description: day.sceneDescription ?? null,
+    on_screen_text: day.onScreenText ?? null,
+    hairstyle: day.hairstyle ?? null,
+    style_option: day.styleOption ?? null,
+    caption: day.caption ?? null,
+    hook: day.hook ?? null,
+    hashtags: day.hashtags ?? null,
+    cta: day.cta ?? null,
+    location: day.location ?? null,
+    music_suggestion: day.musicSuggestion ?? null,
+    notes: day.notes ?? null,
+    generated_image_url: day.generatedImageUrl ?? null,
+    generated_video_url: day.generatedVideoUrl ?? null,
+    custom_media_url: day.customMediaUrl ?? null,
+    pending_video_task_id: day.pendingVideoTaskId ?? null,
+    status: day.status ?? 'draft',
+    is_ai_generated: day.isAIGenerated ?? null,
+    is_good_to_post: day.isGoodToPost ?? null,
+    post_image_references: day.postImageReferences ?? null,
+    slides: day.slides ?? null,
+  };
+}
+
+function dbToDay(row: Record<string, unknown>): ContentDay {
+  return {
+    id: row.id as string,
+    personaId: (row.persona_id as string) ?? '',
+    dayNumber: (row.day_number as number) ?? 0,
+    date: (row.date as string) ?? '',
+    platforms: (row.platforms as string[]) ?? [],
+    contentType: (row.content_type as 'Photo' | 'Carousel' | 'Video') ?? 'Photo',
+    theme: (row.theme as string) ?? '',
+    sceneDescription: (row.scene_description as string) ?? '',
+    onScreenText: (row.on_screen_text as string) ?? '',
+    hairstyle: (row.hairstyle as string | undefined) ?? undefined,
+    styleOption: (row.style_option as string | undefined) ?? undefined,
+    caption: (row.caption as string) ?? '',
+    hook: (row.hook as string) ?? '',
+    hashtags: (row.hashtags as string) ?? '',
+    cta: (row.cta as string) ?? '',
+    location: (row.location as string) ?? '',
+    musicSuggestion: (row.music_suggestion as string) ?? '',
+    notes: (row.notes as string) ?? '',
+    generatedImageUrl: (row.generated_image_url as string | undefined) ?? undefined,
+    generatedVideoUrl: (row.generated_video_url as string | undefined) ?? undefined,
+    customMediaUrl: (row.custom_media_url as string | undefined) ?? undefined,
+    pendingVideoTaskId: (row.pending_video_task_id as string | undefined) ?? undefined,
+    status: (row.status as 'draft' | 'generating' | 'completed' | 'published') ?? 'draft',
+    isAIGenerated: (row.is_ai_generated as boolean | undefined) ?? undefined,
+    isGoodToPost: (row.is_good_to_post as boolean | undefined) ?? undefined,
+    postImageReferences: (row.post_image_references as unknown[] | undefined) ?? undefined,
+    slides: (row.slides as unknown[] | undefined) ?? undefined,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +316,7 @@ function serviceClient(env: Env): SupabaseClient {
 
 /**
  * Extract and validate the bearer token from Authorization header.
- * Returns the token string or throws a 401 Response.
+ * Returns the token string or throws an Error.
  */
 function extractToken(authHeader: string | null): string {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -145,13 +379,9 @@ function extractFolderId(url: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Auth middleware (applied to all routes except the Kling callback)
+// Hono app setup
 // ---------------------------------------------------------------------------
 
-/**
- * Attaches `supabase` (user-scoped client) and `userId` to the Hono context.
- * Skipped for routes that declare their own auth (like the webhook).
- */
 type Variables = {
   supabase: SupabaseClient;
   userId: string;
@@ -165,10 +395,13 @@ appWithVars.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
 }));
 
-// Auth guard — runs before every route except the callback webhook
+// Auth guard — runs before every route except the Kling callback webhook
 appWithVars.use('/api/*', async (c, next) => {
-  // The Kling callback is a server-to-server call — no user token.
   if (c.req.path === '/api/videos/callback' && c.req.method === 'POST') {
+    return next();
+  }
+  // Serve R2 media files without auth (public assets)
+  if (c.req.path.startsWith('/api/media/') && c.req.method === 'GET') {
     return next();
   }
 
@@ -193,13 +426,12 @@ appWithVars.get('/api/personas', async (c) => {
   const supabase = c.get('supabase');
   const { data, error } = await supabase
     .from('personas')
-    .select('data')
+    .select('*')
     .order('created_at', { ascending: true });
 
   if (error) return c.json({ error: error.message }, 500);
 
-  // Each row stores the full persona object as JSONB; unwrap it
-  const personas = (data ?? []).map((r: { data: unknown }) => r.data);
+  const personas = (data ?? []).map((row: Record<string, unknown>) => dbToPersona(row));
   return c.json(personas);
 });
 
@@ -211,7 +443,7 @@ appWithVars.post('/api/personas', async (c) => {
   const supabase = c.get('supabase');
   const userId = c.get('userId');
 
-  let persona: Record<string, unknown>;
+  let persona: Persona;
   try {
     persona = await c.req.json();
   } catch {
@@ -220,9 +452,11 @@ appWithVars.post('/api/personas', async (c) => {
 
   if (!persona.id) return c.json({ error: 'id is required' }, 400);
 
+  const row = personaToDb(persona, userId);
+
   const { error } = await supabase
     .from('personas')
-    .upsert({ id: persona.id, user_id: userId, data: persona }, { onConflict: 'id' });
+    .upsert(row, { onConflict: 'id' });
 
   if (error) return c.json({ error: error.message }, 500);
   return c.json({ success: true, id: persona.id });
@@ -236,9 +470,7 @@ appWithVars.delete('/api/personas/:id', async (c) => {
   const supabase = c.get('supabase');
   const id = c.req.param('id');
 
-  // Delete dependent days first (cascade via app logic; Supabase FK cascade
-  // handles this automatically if you define it in the migration, but we do
-  // it explicitly here so it works regardless of FK config)
+  // Delete dependent days first (handles cases without FK cascade configured)
   const { error: daysErr } = await supabase
     .from('days')
     .delete()
@@ -263,12 +495,12 @@ appWithVars.get('/api/days', async (c) => {
   const supabase = c.get('supabase');
   const { data, error } = await supabase
     .from('days')
-    .select('data')
+    .select('*')
     .order('created_at', { ascending: true });
 
   if (error) return c.json({ error: error.message }, 500);
 
-  const days = (data ?? []).map((r: { data: unknown }) => r.data);
+  const days = (data ?? []).map((row: Record<string, unknown>) => dbToDay(row));
   return c.json(days);
 });
 
@@ -280,7 +512,7 @@ appWithVars.post('/api/days', async (c) => {
   const supabase = c.get('supabase');
   const userId = c.get('userId');
 
-  let day: Record<string, unknown>;
+  let day: ContentDay;
   try {
     day = await c.req.json();
   } catch {
@@ -290,12 +522,11 @@ appWithVars.post('/api/days', async (c) => {
   if (!day.id) return c.json({ error: 'id is required' }, 400);
   if (!day.personaId) return c.json({ error: 'personaId is required' }, 400);
 
+  const row = dayToDb(day, userId);
+
   const { error } = await supabase
     .from('days')
-    .upsert(
-      { id: day.id, persona_id: day.personaId, user_id: userId, data: day },
-      { onConflict: 'id' },
-    );
+    .upsert(row, { onConflict: 'id' });
 
   if (error) return c.json({ error: error.message }, 500);
   return c.json({ success: true, id: day.id });
@@ -315,14 +546,91 @@ appWithVars.delete('/api/days/:id', async (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// Route: GET /api/settings
+// ---------------------------------------------------------------------------
+
+appWithVars.get('/api/settings', async (c) => {
+  const supabase = c.get('supabase');
+  const userId = c.get('userId');
+
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    // PGRST116 = "row not found" — return empty object instead of 500
+    return c.json({ error: error.message }, 500);
+  }
+
+  // Convert snake_case DB columns → camelCase for frontend
+  const row = data as Record<string, unknown> | null;
+  if (!row) return c.json({});
+  return c.json({
+    blotatoApiKey: row.blotato_api_key ?? '',
+    klingApiKey: row.kling_api_key ?? '',
+    klingApiSecret: row.kling_api_secret ?? '',
+    nanobananaApiKey: row.nanobanana_api_key ?? '',
+    driveFolderUrl: row.drive_folder_url ?? '',
+    postingMode: row.posting_mode ?? 'manual',
+    postingTime: row.posting_time ?? '',
+    postingEndTime: row.posting_end_time ?? '',
+    postsPerDay: row.posts_per_day ?? 1,
+    publicTunnelUrl: row.public_tunnel_url ?? '',
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Route: POST /api/settings
+// ---------------------------------------------------------------------------
+
+appWithVars.post('/api/settings', async (c) => {
+  const supabase = c.get('supabase');
+  const userId = c.get('userId');
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  // Map camelCase frontend keys → snake_case DB columns
+  const keyMap: Record<string, string> = {
+    blotatoApiKey: 'blotato_api_key',
+    klingApiKey: 'kling_api_key',
+    klingApiSecret: 'kling_api_secret',
+    nanobananaApiKey: 'nanobanana_api_key',
+    driveFolderUrl: 'drive_folder_url',
+    postingMode: 'posting_mode',
+    postingTime: 'posting_time',
+    postingEndTime: 'posting_end_time',
+    postsPerDay: 'posts_per_day',
+    publicTunnelUrl: 'public_tunnel_url',
+  };
+
+  const row: Record<string, unknown> = { user_id: userId };
+  for (const [camel, snake] of Object.entries(keyMap)) {
+    if (camel in body) row[snake] = body[camel];
+  }
+
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert(row, { onConflict: 'user_id' });
+
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ success: true });
+});
+
+// ---------------------------------------------------------------------------
 // Route: POST /api/images/save
-// Save a base64-encoded image to Supabase Storage under
-//   uploads/{userId}/{personaId}/{filename}
-// Returns a public URL (or a path suitable for re-fetching).
+// Save a base64-encoded image to R2 under
+//   {userId}/{personaId}/{filename}
+// Returns a public URL.
 // ---------------------------------------------------------------------------
 
 appWithVars.post('/api/images/save', async (c) => {
-  const supabase = c.get('supabase');
   const userId = c.get('userId');
 
   let body: { base64?: string; filename?: string; personaId?: string };
@@ -360,20 +668,84 @@ appWithVars.post('/api/images/save', async (c) => {
     ? `${userId}/${personaId}/${filename}`
     : `${userId}/${filename}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from('uploads')
-    .upload(storagePath, bytes.buffer, {
-      contentType: mimeType,
-      upsert: true,
+  try {
+    await c.env.MEDIA_BUCKET.put(storagePath, bytes.buffer, {
+      httpMetadata: { contentType: mimeType },
     });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `R2 upload failed: ${msg}` }, 500);
+  }
 
-  if (uploadError) return c.json({ error: uploadError.message }, 500);
+  const publicUrl = c.env.R2_PUBLIC_URL
+    ? `${c.env.R2_PUBLIC_URL}/${storagePath}`
+    : `/api/media/${storagePath}`;
 
-  const { data: urlData } = supabase.storage
-    .from('uploads')
-    .getPublicUrl(storagePath);
+  return c.json({ success: true, url: publicUrl });
+});
 
-  return c.json({ success: true, url: urlData.publicUrl });
+// ---------------------------------------------------------------------------
+// Route: POST /api/videos/save
+// Download a video from a URL and upload it to R2.
+// Returns the public URL.
+// ---------------------------------------------------------------------------
+
+appWithVars.post('/api/videos/save', async (c) => {
+  const userId = c.get('userId');
+
+  let body: { videoUrl?: string; filename?: string; personaId?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const { videoUrl, filename, personaId } = body;
+  if (!videoUrl) return c.json({ error: 'videoUrl is required' }, 400);
+
+  const safeFilename = filename ?? `video_${Date.now()}.mp4`;
+
+  console.log(`[Worker] Downloading video from: ${videoUrl}`);
+
+  let videoBytes: Uint8Array;
+  let mimeType = 'video/mp4';
+  try {
+    const dlRes = await fetch(videoUrl);
+    if (!dlRes.ok) {
+      return c.json(
+        { error: `Failed to download video: HTTP ${dlRes.status}` },
+        502,
+      );
+    }
+    mimeType = dlRes.headers.get('content-type') ?? 'video/mp4';
+    videoBytes = new Uint8Array(await dlRes.arrayBuffer());
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `Download error: ${msg}` }, 500);
+  }
+
+  const storagePath = personaId
+    ? `${userId}/${personaId}/${safeFilename}`
+    : `${userId}/${safeFilename}`;
+
+  console.log(`[Worker] Uploading video to R2: ${storagePath}`);
+
+  try {
+    await c.env.MEDIA_BUCKET.put(storagePath, videoBytes.buffer, {
+      httpMetadata: { contentType: mimeType },
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `R2 upload failed: ${msg}` }, 500);
+  }
+
+  const publicUrl = c.env.R2_PUBLIC_URL
+    ? `${c.env.R2_PUBLIC_URL}/${storagePath}`
+    : `/api/media/${storagePath}`;
+
+  console.log(`[Worker] Video saved: ${publicUrl}`);
+
+  return c.json({ success: true, url: publicUrl });
 });
 
 // ---------------------------------------------------------------------------
@@ -562,18 +934,18 @@ appWithVars.get('/api/videos/status/:taskId', async (c) => {
 appWithVars.post('/api/videos/callback', async (c) => {
   const supabase = serviceClient(c.env);
 
-  let data: Record<string, unknown>;
+  let payload: Record<string, unknown>;
   try {
-    data = await c.req.json();
+    payload = await c.req.json();
   } catch {
     return c.json({ error: 'Invalid JSON body' }, 400);
   }
 
-  console.log('[Webhook] Kling callback received:', JSON.stringify(data));
+  console.log('[Webhook] Kling callback received:', JSON.stringify(payload));
 
-  const taskId = data.task_id as string | undefined;
-  const status = data.task_status as string | undefined;
-  const taskResult = data.task_result as Record<string, unknown> | undefined;
+  const taskId = payload.task_id as string | undefined;
+  const status = payload.task_status as string | undefined;
+  const taskResult = payload.task_result as Record<string, unknown> | undefined;
   const videoUrl = (taskResult?.videos as { url?: string }[] | undefined)?.[0]?.url;
 
   if (status !== 'succeed' || !videoUrl || !taskId) {
@@ -595,25 +967,13 @@ appWithVars.post('/api/videos/callback', async (c) => {
 
   const { day_id, user_id } = taskRow as { day_id: string; user_id: string };
 
-  // Fetch the day's JSONB blob
-  const { data: dayRow, error: dayErr } = await supabase
-    .from('days')
-    .select('data')
-    .eq('id', day_id)
-    .single();
-
-  if (dayErr || !dayRow) {
-    console.log(`[Webhook] Day ${day_id} not found for task ${taskId}`);
-    return c.json({ success: true });
-  }
-
-  const dayData = dayRow.data as Record<string, unknown>;
-  dayData.generatedVideoUrl = videoUrl;
-  dayData.status = 'completed';
-
+  // Update normalized columns directly — no JSONB blob fetch needed
   const { error: updateErr } = await supabase
     .from('days')
-    .update({ data: dayData })
+    .update({
+      generated_video_url: videoUrl,
+      status: 'completed',
+    })
     .eq('id', day_id);
 
   if (updateErr) {
@@ -627,7 +987,7 @@ appWithVars.post('/api/videos/callback', async (c) => {
 
 // ---------------------------------------------------------------------------
 // Route: POST /api/blotato/publish
-// Fetch media (local Supabase Storage or remote URL), upload to Blotato,
+// Fetch media (R2 storage or remote URL), upload to Blotato,
 // publish to Instagram.
 //
 // NOTE: Canvas text overlay has moved to the browser.
@@ -635,7 +995,6 @@ appWithVars.post('/api/videos/callback', async (c) => {
 // ---------------------------------------------------------------------------
 
 appWithVars.post('/api/blotato/publish', async (c) => {
-  const supabase = c.get('supabase');
   const userId = c.get('userId');
 
   let body: {
@@ -704,7 +1063,7 @@ appWithVars.post('/api/blotato/publish', async (c) => {
     let mimeType = 'image/jpeg';
 
     if (mediaPath.startsWith('http')) {
-      // Could be a Supabase Storage public URL or any remote URL
+      // Remote URL — fetch directly
       const dlRes = await fetch(mediaPath);
       if (!dlRes.ok) {
         throw new Error(`Failed to download media from ${mediaPath}: ${await dlRes.text()}`);
@@ -712,27 +1071,22 @@ appWithVars.post('/api/blotato/publish', async (c) => {
       mimeType = dlRes.headers.get('content-type') ?? 'image/jpeg';
       bytes = new Uint8Array(await dlRes.arrayBuffer());
     } else {
-      // Treat as a Supabase Storage path: strip leading slash if present
+      // Treat as an R2 storage path: strip leading slash if present
       const storagePath = mediaPath.startsWith('/') ? mediaPath.slice(1) : mediaPath;
 
-      // Check if it looks like a Supabase storage path (uploads/...) or
-      // a legacy local path (/uploads/personaId/file.jpg).
-      // We re-map legacy paths to userId/personaId/filename inside the bucket.
+      // Re-map legacy paths to userId/personaId/filename inside the bucket
       const pathParts = storagePath.replace(/^uploads\//, '').split('/');
       const resolvedPath = pathParts.length >= 2
         ? `${userId}/${pathParts.join('/')}`
         : `${userId}/${storagePath}`;
 
-      const { data: fileData, error: dlErr } = await supabase.storage
-        .from('uploads')
-        .download(resolvedPath);
-
-      if (dlErr || !fileData) {
-        throw new Error(`Media not found in Supabase Storage at ${resolvedPath}: ${dlErr?.message}`);
+      const obj = await c.env.MEDIA_BUCKET.get(resolvedPath);
+      if (!obj) {
+        throw new Error(`Media not found in R2 at ${resolvedPath}`);
       }
 
-      mimeType = resolvedPath.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';
-      bytes = new Uint8Array(await fileData.arrayBuffer());
+      mimeType = obj.httpMetadata?.contentType ?? (resolvedPath.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg');
+      bytes = new Uint8Array(await obj.arrayBuffer());
     }
 
     // Encode bytes to base64 for Blotato upload
@@ -831,6 +1185,7 @@ appWithVars.post('/api/blotato/publish', async (c) => {
 
 appWithVars.post('/api/drive/list', async (c) => {
   const supabase = c.get('supabase');
+  const userId = c.get('userId');
 
   let body: { folderUrl?: string };
   try {
@@ -887,10 +1242,12 @@ appWithVars.post('/api/drive/list', async (c) => {
 
   console.log(`[Drive] Found ${allFiles.length} media files`);
 
-  // Upsert into drive_assets — preserve existing status on conflict
+  // Upsert into drive_assets
+  // - Do NOT set `id` — let DB auto-generate UUID
+  // - Use composite unique constraint (user_id, drive_file_id)
   const now = new Date().toISOString();
   const upsertRows = allFiles.map((f) => ({
-    id: f.id,
+    user_id: userId,
     drive_file_id: f.id,
     file_name: f.name,
     mime_type: f.mimeType ?? '',
@@ -905,7 +1262,7 @@ appWithVars.post('/api/drive/list', async (c) => {
     const { error: upsertErr } = await supabase
       .from('drive_assets')
       .upsert(upsertRows, {
-        onConflict: 'drive_file_id',
+        onConflict: 'user_id,drive_file_id',
         ignoreDuplicates: false,
       });
 
@@ -1019,6 +1376,21 @@ appWithVars.get('/api/drive/stats', async (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// Route: GET /api/media/*
+// Serve R2 files directly (fallback when R2 public access isn't configured).
+// ---------------------------------------------------------------------------
+
+appWithVars.get('/api/media/*', async (c) => {
+  const key = c.req.path.replace('/api/media/', '');
+  const obj = await c.env.MEDIA_BUCKET.get(key);
+  if (!obj) return c.json({ error: 'Not found' }, 404);
+  const headers = new Headers();
+  headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
+  headers.set('Cache-Control', 'public, max-age=31536000');
+  return new Response(obj.body, { headers });
+});
+
+// ---------------------------------------------------------------------------
 // Health check
 // ---------------------------------------------------------------------------
 
@@ -1029,101 +1401,3 @@ appWithVars.get('/health', (c) => c.json({ status: 'ok', ts: Date.now() }));
 // ---------------------------------------------------------------------------
 
 export default appWithVars;
-
-// ===========================================================================
-// SUPABASE MIGRATION
-// Run this SQL in the Supabase SQL editor (or save as a migration file).
-// ===========================================================================
-//
-// -- Enable UUID generation
-// CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-//
-// -- personas
-// CREATE TABLE IF NOT EXISTS personas (
-//   id          TEXT PRIMARY KEY,
-//   user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-//   data        JSONB NOT NULL DEFAULT '{}',
-//   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-// );
-// CREATE INDEX IF NOT EXISTS personas_user_id_idx ON personas(user_id);
-//
-// ALTER TABLE personas ENABLE ROW LEVEL SECURITY;
-// CREATE POLICY "Users can CRUD their own personas"
-//   ON personas FOR ALL USING (auth.uid() = user_id);
-//
-// -- days
-// CREATE TABLE IF NOT EXISTS days (
-//   id          TEXT PRIMARY KEY,
-//   persona_id  TEXT NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
-//   user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-//   data        JSONB NOT NULL DEFAULT '{}',
-//   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-// );
-// CREATE INDEX IF NOT EXISTS days_user_id_idx      ON days(user_id);
-// CREATE INDEX IF NOT EXISTS days_persona_id_idx   ON days(persona_id);
-//
-// ALTER TABLE days ENABLE ROW LEVEL SECURITY;
-// CREATE POLICY "Users can CRUD their own days"
-//   ON days FOR ALL USING (auth.uid() = user_id);
-//
-// -- video_tasks
-// CREATE TABLE IF NOT EXISTS video_tasks (
-//   task_id     TEXT PRIMARY KEY,
-//   day_id      TEXT NOT NULL,
-//   user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-//   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-// );
-// CREATE INDEX IF NOT EXISTS video_tasks_user_id_idx ON video_tasks(user_id);
-//
-// ALTER TABLE video_tasks ENABLE ROW LEVEL SECURITY;
-// CREATE POLICY "Users can read their own video tasks"
-//   ON video_tasks FOR SELECT USING (auth.uid() = user_id);
-// CREATE POLICY "Service role can manage all video tasks"
-//   ON video_tasks FOR ALL USING (auth.role() = 'service_role');
-//
-// -- drive_assets  (no user_id — shared/global asset library)
-// CREATE TABLE IF NOT EXISTS drive_assets (
-//   id             TEXT PRIMARY KEY,
-//   drive_file_id  TEXT UNIQUE NOT NULL,
-//   file_name      TEXT NOT NULL,
-//   mime_type      TEXT NOT NULL DEFAULT '',
-//   file_size      BIGINT DEFAULT 0,
-//   drive_url      TEXT DEFAULT '',
-//   thumbnail_url  TEXT DEFAULT '',
-//   content_type   TEXT DEFAULT 'Photo',
-//   status         TEXT DEFAULT 'unused',
-//   linked_day_id  TEXT,
-//   synced_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-// );
-// CREATE INDEX IF NOT EXISTS drive_assets_status_idx       ON drive_assets(status);
-// CREATE INDEX IF NOT EXISTS drive_assets_content_type_idx ON drive_assets(content_type);
-//
-// ALTER TABLE drive_assets ENABLE ROW LEVEL SECURITY;
-// -- Authenticated users can read all drive assets
-// CREATE POLICY "Authenticated users can read drive_assets"
-//   ON drive_assets FOR SELECT USING (auth.role() = 'authenticated');
-// -- Authenticated users can insert/update/delete
-// CREATE POLICY "Authenticated users can write drive_assets"
-//   ON drive_assets FOR ALL USING (auth.role() = 'authenticated');
-//
-// -- Storage: create the uploads bucket
-// INSERT INTO storage.buckets (id, name, public)
-// VALUES ('uploads', 'uploads', true)
-// ON CONFLICT (id) DO NOTHING;
-//
-// -- Storage RLS: allow authenticated users to manage their own files
-// CREATE POLICY "Users can upload to their own folder"
-//   ON storage.objects FOR INSERT
-//   WITH CHECK (bucket_id = 'uploads' AND (storage.foldername(name))[1] = auth.uid()::text);
-//
-// CREATE POLICY "Users can update their own files"
-//   ON storage.objects FOR UPDATE
-//   USING (bucket_id = 'uploads' AND (storage.foldername(name))[1] = auth.uid()::text);
-//
-// CREATE POLICY "Users can delete their own files"
-//   ON storage.objects FOR DELETE
-//   USING (bucket_id = 'uploads' AND (storage.foldername(name))[1] = auth.uid()::text);
-//
-// CREATE POLICY "Public read access to uploads bucket"
-//   ON storage.objects FOR SELECT
-//   USING (bucket_id = 'uploads');

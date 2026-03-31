@@ -15,12 +15,17 @@ enabled = true
 #   wrangler secret put DRIVE_API_KEY
 #   wrangler secret put GEMINI_API_KEY
 # -----------------------------------------------------------------------
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "creatorstudio-media"
+
 [vars]
 SUPABASE_URL = ""
 SUPABASE_ANON_KEY = ""
 SUPABASE_SERVICE_ROLE_KEY = ""
 DRIVE_API_KEY = ""
 GEMINI_API_KEY = ""
+R2_PUBLIC_URL = ""
 
 # Local dev: copy these into a .dev.vars file (git-ignored) instead of
 # editing this file, so secrets never land in source control.
