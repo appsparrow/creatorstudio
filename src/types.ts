@@ -56,6 +56,8 @@ export interface Persona {
   targetAudiences?: TargetAudience[];
   contentThemes?: string[];
   friends?: PersonaFriend[];
+  // Thumbnail style references — uploaded examples of the persona's thumbnail aesthetic
+  thumbnailReferenceUrls?: string[];
   // Per-persona settings
   driveFolderUrl?: string;
   postingMode?: 'manual' | 'auto';
@@ -150,6 +152,7 @@ export interface ContentDay {
   generatedImageUrl?: string;
   generatedVideoUrl?: string;
   customMediaUrl?: string;
+  thumbnailUrl?: string;
   pendingVideoTaskId?: string;
   status: ContentStatus;
   personaId: string;

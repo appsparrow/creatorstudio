@@ -801,6 +801,53 @@ If other people appear in the scene, they must be of DIFFERENT races and ethnici
   }, [selectedDay, editedSettings, updateDayField]);
 
   // ============================================================================
+  // Thumbnail Generation
+  // ============================================================================
+
+  const handleGenerateThumbnail = useCallback(async () => {
+    if (!selectedDay || !selectedPersona) return;
+    setIsGenerating(true);
+    setGeneratingStatus('Generating thumbnail...');
+    try {
+      const ai = await getAiInstance();
+
+      const thumbnailConcept = selectedDay.notes?.match(/\[THUMBNAIL\] (.+?)(?:\n|$)/)?.[1] || selectedDay.theme;
+
+      const prompt = `Generate a THUMBNAIL image for a social media video/reel.
+This is ${selectedPersona.identity.fullName}, ${selectedPersona.identity.profession}.
+
+THUMBNAIL CONCEPT: ${thumbnailConcept}
+VIDEO THEME: ${selectedDay.theme}
+
+THUMBNAIL STYLE RULES:
+- Close-up or medium shot of the persona
+- Expressive face (surprised, confident, playful, or dramatic expression)
+- Eye-catching composition that makes people want to click
+- Portrait orientation (9:16)
+- The persona should be the ONLY person in the thumbnail
+- Bold, attention-grabbing framing
+- Professional influencer quality
+
+Persona appearance: ${selectedPersona.appearance.height}, ${selectedPersona.appearance.bodyType},
+${selectedPersona.appearance.faceShape} face, ${selectedPersona.appearance.eyes} eyes,
+${selectedPersona.appearance.hair} hair.
+${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}` : ''}`;
+
+      const refImages = selectedPersona.thumbnailReferenceUrls?.length
+        ? selectedPersona.thumbnailReferenceUrls
+        : selectedPersona.referenceImageUrls || [];
+
+      const url = await generateSingleImage(ai, prompt, '', selectedPersona, selectedDay, refImages);
+
+      updateDayField('thumbnailUrl', url);
+    } catch (e) {
+      console.error('Thumbnail generation failed:', e);
+    }
+    setIsGenerating(false);
+    setGeneratingStatus('');
+  }, [selectedDay, selectedPersona, generateSingleImage, updateDayField]);
+
+  // ============================================================================
   // AI Content Plan Generation
   // ============================================================================
 
@@ -1658,6 +1705,7 @@ If other people appear in the scene, they must be of DIFFERENT races and ethnici
               });
             }}
             onGenerateVideo={handleGenerateVideo}
+            onGenerateThumbnail={handleGenerateThumbnail}
             onPublish={handlePublish}
             isGenerating={isGenerating}
             generatingStatus={generatingStatus}
@@ -1973,6 +2021,7 @@ function PostCard({
   onGenerateImage,
   onConfirmGenerate,
   onGenerateVideo,
+  onGenerateThumbnail,
   onPublish,
   isGenerating,
   generatingStatus,
@@ -1989,6 +2038,7 @@ function PostCard({
   onGenerateImage: () => void;
   onConfirmGenerate: () => void;
   onGenerateVideo: () => void;
+  onGenerateThumbnail: () => void;
   onPublish: () => void;
   isGenerating: boolean;
   generatingStatus: string;
@@ -2182,20 +2232,76 @@ function PostCard({
               {/* --- VIDEO media panel --- */}
               {day.contentType === 'Video' && (
                 <>
-                  {/* Thumbnail preview (smaller) */}
-                  {day.generatedImageUrl && (
-                    <div className="relative">
-                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Thumbnail / Key Frame</p>
-                      <div className="rounded-xl overflow-hidden border border-gray-700 relative">
-                        <img src={day.generatedImageUrl} alt="Thumbnail" className="w-full aspect-video object-cover" />
+                  {/* Thumbnail section */}
+                  <div className="bg-gray-800/20 rounded-xl p-3 space-y-2">
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Thumbnail</p>
+                    {day.thumbnailUrl ? (
+                      <div className="relative cursor-pointer" onClick={() => onOpenLightbox(day.thumbnailUrl!)}>
+                        <img src={day.thumbnailUrl} alt="Thumbnail" className="w-full aspect-video object-cover rounded-lg border border-gray-700" />
+                        <button
+                          onClick={e => { e.stopPropagation(); onUpdateField('thumbnailUrl', undefined as any); }}
+                          className="absolute top-2 right-2 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center hover:bg-red-500/80 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5 text-white" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 border border-dashed border-gray-700 rounded-lg">
+                        <Image className="w-6 h-6 text-gray-600" />
+                        <p className="text-[10px] text-gray-600">No thumbnail yet</p>
+                      </div>
+                    )}
+                    <button
+                      onClick={onGenerateThumbnail}
+                      disabled={isGenerating}
+                      className="w-full px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-xs font-medium text-gray-300 transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      {isGenerating && generatingStatus.includes('thumbnail') ? (
+                        <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generatingStatus}</>
+                      ) : (
+                        <><Sparkles className="w-3.5 h-3.5" /> Generate Thumbnail</>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Video Frame section */}
+                  <div className="bg-gray-800/20 rounded-xl p-3 space-y-2">
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Video Frame</p>
+                    {day.generatedImageUrl ? (
+                      <div className="relative cursor-pointer" onClick={() => onOpenLightbox(day.generatedImageUrl!)}>
+                        <img src={day.generatedImageUrl} alt="Video frame" className="w-full aspect-video object-cover rounded-lg border border-gray-700" />
                         {day.styleOption && (
                           <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-medium px-2 py-0.5 rounded-lg flex items-center gap-1">
                             <Camera className="w-3 h-3" /> {day.styleOption}
                           </span>
                         )}
                       </div>
+                    ) : (
+                      <div className="w-full aspect-video flex flex-col items-center justify-center gap-3 bg-gray-800/20 border-2 border-dashed border-gray-700 rounded-lg px-4">
+                        <Video className="w-8 h-8 text-gray-600" />
+                        <p className="text-sm text-gray-600 text-center">{day.sceneDescription || 'No scene described yet'}</p>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <button onClick={onConfirmGenerate} disabled={isGenerating} className="flex-1 px-3 py-2 rounded-lg bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center justify-center gap-1.5">
+                        {isGenerating && generatingStatus.includes('image') ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generatingStatus}</> : <><Image className="w-3.5 h-3.5" /> {day.generatedImageUrl ? 'Regen' : 'Generate'}</>}
+                      </button>
+                      <button
+                        onClick={() => onOpenDrivePicker('single')}
+                        className="flex-1 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-300 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" /> From Drive
+                      </button>
                     </div>
+                  </div>
+
+                  {/* Generate Video button */}
+                  {day.generatedImageUrl && !day.generatedVideoUrl && (
+                    <button onClick={onGenerateVideo} disabled={isGenerating} className="w-full px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-sm font-medium text-gray-300 transition-colors flex items-center justify-center gap-2">
+                      <Video className="w-4 h-4" /> Generate Video
+                    </button>
                   )}
+
                   {/* Video player */}
                   {day.generatedVideoUrl && (
                     <div className="rounded-xl overflow-hidden border border-gray-700">
@@ -2211,30 +2317,7 @@ function PostCard({
                       </div>
                     </div>
                   )}
-                  {/* Empty state */}
-                  {!day.generatedImageUrl && (
-                    <div className="w-full aspect-video flex flex-col items-center justify-center gap-3 bg-gray-800/20 border-2 border-dashed border-gray-700 rounded-xl px-4">
-                      <Video className="w-8 h-8 text-gray-600" />
-                      <p className="text-sm text-gray-600 text-center">{day.sceneDescription || 'No scene described yet'}</p>
-                    </div>
-                  )}
-                  {/* Generation + Drive buttons */}
-                  <div className="flex gap-2">
-                    <button onClick={onConfirmGenerate} disabled={isGenerating} className="flex-1 px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-sm font-semibold text-white transition-colors flex items-center justify-center gap-2">
-                      {isGenerating && generatingStatus.includes('image') ? <><Loader2 className="w-4 h-4 animate-spin" /> {generatingStatus}</> : <><Image className="w-4 h-4" /> {day.generatedImageUrl ? 'Regen' : 'Generate'}</>}
-                    </button>
-                    <button
-                      onClick={() => onOpenDrivePicker('single')}
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-medium text-gray-300 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <FolderOpen className="w-4 h-4" /> From Drive
-                    </button>
-                  </div>
-                  {day.generatedImageUrl && !day.generatedVideoUrl && (
-                    <button onClick={onGenerateVideo} disabled={isGenerating} className="w-full px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-sm font-medium text-gray-300 transition-colors flex items-center justify-center gap-2">
-                      <Video className="w-4 h-4" /> Generate Video
-                    </button>
-                  )}
+
                   {/* Video generation status */}
                   {!day.generatedVideoUrl && (videoStatus === 'submitted' || videoStatus === 'processing') && (
                     <div className="flex items-center gap-2 text-sm text-gray-400 bg-gray-800/40 rounded-xl px-4 py-3">
@@ -2873,6 +2956,7 @@ function PersonaEditorPanel({
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tab, setTab] = useState<'profile' | 'friends' | 'audience' | 'settings'>('profile');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailFileRef = useRef<HTMLInputElement>(null);
   const friendFileRefs = useRef<(HTMLInputElement | null)[]>([]);
   const p = persona;
 
@@ -2905,6 +2989,35 @@ function PersonaEditorPanel({
         if (persona.referenceImageUrl === (persona.referenceImageUrls || [])[idx]) {
           onUpdateField('referenceImageUrl', urls[0] || '');
         }
+      },
+    });
+  };
+
+  const handleThumbnailRefUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      try {
+        const result = await saveImage(base64, `thumb_ref_${Date.now()}.png`, persona.id);
+        const urls = [...(persona.thumbnailReferenceUrls || []), result.url];
+        onUpdateField('thumbnailReferenceUrls', urls);
+      } catch (err) { console.error('Thumbnail ref upload failed:', err); }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeThumbnailRefImage = (idx: number) => {
+    onShowConfirm({
+      title: 'Remove Thumbnail Reference',
+      message: 'Remove this thumbnail style reference?',
+      confirmLabel: 'Remove',
+      confirmVariant: 'danger',
+      onConfirm: () => {
+        const urls = [...(persona.thumbnailReferenceUrls || [])];
+        urls.splice(idx, 1);
+        onUpdateField('thumbnailReferenceUrls', urls);
       },
     });
   };
@@ -3038,6 +3151,32 @@ function PersonaEditorPanel({
                   <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">Click image to set as primary. These train AI consistency.</p>
+              </div>
+
+              {/* Thumbnail Style References */}
+              <div>
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Thumbnail Style References</p>
+                <div className="flex flex-wrap gap-2">
+                  {(p.thumbnailReferenceUrls || []).map((url, i) => (
+                    <div key={i} className="relative group">
+                      <img
+                        src={url} alt=""
+                        className="w-16 h-16 rounded-lg object-cover border-2 border-gray-700 hover:border-gray-500 transition-all"
+                      />
+                      <button onClick={() => removeThumbnailRefImage(i)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => thumbnailFileRef.current?.click()}
+                    className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-700 hover:border-gray-500 flex items-center justify-center text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                  <input ref={thumbnailFileRef} type="file" accept="image/*" onChange={handleThumbnailRefUpload} className="hidden" />
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1.5">Upload examples of thumbnail styles for this persona's videos</p>
               </div>
 
               {/* Quick Stats */}

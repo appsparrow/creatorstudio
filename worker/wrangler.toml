@@ -22,8 +22,7 @@ bucket_name = "creatorstudio-media"
 # Secrets are set via `wrangler secret put` — do NOT define them in [vars]
 # SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, DRIVE_API_KEY, GEMINI_API_KEY
 
-[vars]
-R2_PUBLIC_URL = ""
+# All env vars set via `wrangler secret put` — no [vars] section needed
 
 # Local dev: copy these into a .dev.vars file (git-ignored) instead of
 # editing this file, so secrets never land in source control.
