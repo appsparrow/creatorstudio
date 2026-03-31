@@ -1513,22 +1513,16 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                     }
                   }}
                   className={cn(
-                    'w-full flex items-center gap-2 px-2 py-2.5 text-left transition-colors border-b border-gray-800/50 group/sidebar cursor-pointer',
+                    'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-gray-800/50 group/sidebar cursor-pointer',
                     day.id === selectedDayId ? 'bg-white/5 border-l-2 border-l-white' : 'hover:bg-gray-800/50'
                   )}
                   onClick={() => selectDay(day.id)}
                 >
-                  {/* Drag handle — only for non-published, visible on hover */}
-                  {!isPublished ? (
-                    <div className="w-4 flex-shrink-0 flex items-center justify-center opacity-0 group-hover/sidebar:opacity-60 cursor-grab active:cursor-grabbing transition-opacity">
-                      <GripVertical className="w-3.5 h-3.5 text-gray-500" />
-                    </div>
-                  ) : (
-                    <div className="w-4 flex-shrink-0" />
-                  )}
-
-                  {/* Date box */}
-                  <div className="w-10 h-10 rounded-lg bg-gray-800 flex flex-col items-center justify-center flex-shrink-0">
+                  {/* Date box — acts as drag affordance */}
+                  <div className={cn(
+                    "w-10 h-10 rounded-lg bg-gray-800 flex flex-col items-center justify-center flex-shrink-0 transition-colors",
+                    !isPublished && "group-hover/sidebar:bg-gray-700 cursor-grab active:cursor-grabbing"
+                  )}>
                     <span className="text-[9px] font-bold text-gray-400 leading-none">{month}</span>
                     <span className="text-sm font-bold text-white leading-tight">{dayNum}</span>
                   </div>
