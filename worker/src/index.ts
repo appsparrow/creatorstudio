@@ -104,6 +104,8 @@ interface Persona {
   referenceImageUrl?: string;
   referenceImageUrls?: string[];
   aiAnalysis?: string;
+  instagramAccountId?: string;
+  facebookPageId?: string;
 }
 
 interface ContentDay {
@@ -165,6 +167,8 @@ function personaToDb(persona: Persona, userId: string): Record<string, unknown> 
     reference_image_url: persona.referenceImageUrl ?? null,
     reference_image_urls: persona.referenceImageUrls ?? null,
     ai_analysis: persona.aiAnalysis ?? null,
+    instagram_account_id: persona.instagramAccountId ?? null,
+    facebook_page_id: persona.facebookPageId ?? null,
   };
 }
 
@@ -217,6 +221,8 @@ function dbToPersona(row: Record<string, unknown>): Persona {
     referenceImageUrl: (row.reference_image_url as string | undefined) ?? undefined,
     referenceImageUrls: (row.reference_image_urls as string[] | undefined) ?? undefined,
     aiAnalysis: (row.ai_analysis as string | undefined) ?? undefined,
+    instagramAccountId: (row.instagram_account_id as string | undefined) ?? undefined,
+    facebookPageId: (row.facebook_page_id as string | undefined) ?? undefined,
   };
 }
 
@@ -578,6 +584,8 @@ appWithVars.get('/api/settings', async (c) => {
     postingEndTime: row.posting_end_time ?? '',
     postsPerDay: row.posts_per_day ?? 1,
     publicTunnelUrl: row.public_tunnel_url ?? '',
+    metaAccessToken: row.meta_access_token ?? '',
+    metaAppId: row.meta_app_id ?? '',
   });
 });
 
@@ -608,6 +616,8 @@ appWithVars.post('/api/settings', async (c) => {
     postingEndTime: 'posting_end_time',
     postsPerDay: 'posts_per_day',
     publicTunnelUrl: 'public_tunnel_url',
+    metaAccessToken: 'meta_access_token',
+    metaAppId: 'meta_app_id',
   };
 
   const row: Record<string, unknown> = { user_id: userId };
@@ -983,6 +993,183 @@ appWithVars.post('/api/videos/callback', async (c) => {
   }
 
   return c.json({ success: true });
+});
+
+// ---------------------------------------------------------------------------
+// Route: GET /api/meta/accounts
+// Discover Instagram Business Account IDs from the Meta token.
+// ---------------------------------------------------------------------------
+
+appWithVars.get('/api/meta/accounts', async (c) => {
+  const token = c.req.query('token');
+  if (!token) return c.json({ error: 'Provide ?token=YOUR_META_TOKEN' }, 400);
+
+  const GRAPH_URL = 'https://graph.facebook.com/v22.0';
+
+  try {
+    // Get all Facebook Pages
+    const pagesRes = await fetch(`${GRAPH_URL}/me/accounts?fields=id,name&access_token=${token}`);
+    const pagesData = await pagesRes.json() as any;
+    if (pagesData.error) return c.json({ error: pagesData.error.message }, 400);
+
+    const pages = pagesData.data || [];
+    const accounts: any[] = [];
+
+    // For each page, get linked Instagram Business Account
+    for (const page of pages) {
+      const igRes = await fetch(
+        `${GRAPH_URL}/${page.id}?fields=instagram_business_account{id,name,username,profile_picture_url}&access_token=${token}`
+      );
+      const igData = await igRes.json() as any;
+      const ig = igData.instagram_business_account;
+
+      accounts.push({
+        facebookPageId: page.id,
+        facebookPageName: page.name,
+        instagramAccountId: ig?.id || null,
+        instagramUsername: ig?.username || null,
+        status: ig ? 'connected' : 'no Instagram linked',
+      });
+    }
+
+    return c.json({
+      accounts,
+      hint: 'Use instagramAccountId (NOT facebookPageId) in persona settings.',
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Route: POST /api/meta/publish
+// Publish to Instagram via Meta Graph API (Photo, Carousel, Reel).
+// ---------------------------------------------------------------------------
+
+appWithVars.post('/api/meta/publish', async (c) => {
+  const body = await c.req.json();
+  const {
+    imageUrl,
+    videoUrl,
+    caption,
+    contentType,
+    slideImageUrls,
+    instagramAccountId,
+    metaAccessToken,
+  } = body as {
+    imageUrl?: string;
+    videoUrl?: string;
+    caption?: string;
+    contentType?: string;
+    slideImageUrls?: string[];
+    instagramAccountId?: string;
+    metaAccessToken?: string;
+  };
+
+  if (!instagramAccountId || !metaAccessToken) {
+    return c.json({ error: 'Instagram Account ID and Meta Access Token required' }, 400);
+  }
+
+  const GRAPH_URL = 'https://graph.facebook.com/v22.0';
+
+  // Helper: Meta Graph API uses URL-encoded form params, NOT JSON body
+  const graphPost = async (endpoint: string, params: Record<string, string>) => {
+    params.access_token = metaAccessToken;
+    const formBody = new URLSearchParams(params).toString();
+    console.log(`[Meta] POST ${endpoint}`);
+    const res = await fetch(`${GRAPH_URL}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formBody,
+    });
+    const data = await res.json() as any;
+    console.log(`[Meta] Response:`, JSON.stringify(data).slice(0, 300));
+    if (data.error) throw new Error(`Meta API: ${data.error.message} (code: ${data.error.code})`);
+    return data;
+  };
+
+  try {
+    if (contentType === 'Photo') {
+      // Step 1: Create media container
+      const container = await graphPost(`/${instagramAccountId}/media`, {
+        image_url: imageUrl!,
+        caption: caption || '',
+      });
+
+      // Step 2: Publish
+      const published = await graphPost(`/${instagramAccountId}/media_publish`, {
+        creation_id: container.id,
+      });
+
+      return c.json({ success: true, postId: published.id });
+    }
+
+    if (contentType === 'Carousel') {
+      // Step 1: Create containers for each slide
+      const childIds: string[] = [];
+      for (const slideUrl of (slideImageUrls || [])) {
+        const data = await graphPost(`/${instagramAccountId}/media`, {
+          image_url: slideUrl,
+          is_carousel_item: 'true',
+        });
+        childIds.push(data.id);
+      }
+
+      // Step 2: Create carousel container
+      const carousel = await graphPost(`/${instagramAccountId}/media`, {
+        media_type: 'CAROUSEL',
+        children: childIds.join(','),
+        caption: caption || '',
+      });
+
+      // Step 3: Publish
+      const published = await graphPost(`/${instagramAccountId}/media_publish`, {
+        creation_id: carousel.id,
+      });
+
+      return c.json({ success: true, postId: published.id });
+    }
+
+    if (contentType === 'Video') {
+      // Step 1: Create reel container
+      const container = await graphPost(`/${instagramAccountId}/media`, {
+        media_type: 'REELS',
+        video_url: videoUrl!,
+        caption: caption || '',
+        share_to_feed: 'true',
+      });
+
+      // Step 2: Poll until video is processed
+      let status = 'IN_PROGRESS';
+      let attempts = 0;
+      while (status === 'IN_PROGRESS' && attempts < 30) {
+        await new Promise(r => setTimeout(r, 5000));
+        attempts++;
+        const statusRes = await fetch(
+          `${GRAPH_URL}/${container.id}?fields=status_code&access_token=${metaAccessToken}`
+        );
+        const statusData = await statusRes.json() as any;
+        status = statusData.status_code || 'IN_PROGRESS';
+        console.log(`[Meta] Video processing: attempt ${attempts}, status: ${status}`);
+        if (status === 'ERROR') throw new Error('Video processing failed on Meta servers');
+      }
+      if (status !== 'FINISHED') throw new Error('Video processing timed out');
+
+      // Step 3: Publish
+      const published = await graphPost(`/${instagramAccountId}/media_publish`, {
+        creation_id: container.id,
+      });
+
+
+      return c.json({ success: true, postId: published.id });
+    }
+
+    return c.json({ error: 'Invalid content type' }, 400);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[Meta Publish] Error:', msg);
+    return c.json({ error: msg }, 500);
+  }
 });
 
 // ---------------------------------------------------------------------------

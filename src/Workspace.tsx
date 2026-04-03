@@ -17,6 +17,7 @@ import {
   fetchUserSettings, saveUserSettings,
   saveImage, generateVideo, checkVideoStatus, saveVideo,
   publishToBlotato,
+  publishToMeta, discoverMetaAccounts,
   syncDriveFiles, fetchDriveAssets,
 } from './services/api';
 import { getAiInstance, GENERATION_MODEL, TEXT_MODEL } from './services/ai';
@@ -59,6 +60,17 @@ function formatDate(dateStr: string) {
 
 function getInitials(name: string) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+/** Convert Google Drive download URLs to embeddable thumbnail URLs */
+function driveDisplayUrl(url: string | undefined): string {
+  if (!url) return '';
+  // Already a non-drive URL — use as-is
+  if (!url.includes('drive.google.com')) return url;
+  // Extract file ID from various Drive URL formats
+  const match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`;
+  return url;
 }
 
 const emptyPersona = (): Persona => ({
@@ -1080,12 +1092,24 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
   // Publishing
   // ============================================================================
 
+  const useMetaApi = !!(selectedPersona?.instagramAccountId && editedSettings.metaAccessToken);
+
   const handlePublish = useCallback(async () => {
     if (!selectedDay) return;
-    const blotatoKey = editedSettings.blotatoApiKey;
-    if (!blotatoKey) {
-      setError('Blotato API key is required. Add it in Settings.');
-      return;
+
+    const persona = selectedPersona;
+    const metaToken = editedSettings.metaAccessToken;
+    const igAccountId = persona?.instagramAccountId;
+
+    // Determine publish method
+    const useMeta = !!(igAccountId && metaToken);
+
+    if (!useMeta) {
+      const blotatoKey = editedSettings.blotatoApiKey;
+      if (!blotatoKey) {
+        setError('No publishing method configured. Add Meta API credentials or Blotato API key in Settings.');
+        return;
+      }
     }
 
     setIsGenerating(true);
@@ -1093,23 +1117,63 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
     setError('');
 
     try {
-      const base = editedSettings.publicTunnelUrl || window.location.origin;
-      const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
-      const mapUrl = (u?: string) => u?.startsWith('/') ? `${cleanBase}${u}` : u;
+      if (useMeta) {
+        // --- Meta Graph API ---
+        const caption = selectedDay.hashtags
+          ? `${selectedDay.caption}\n\n${selectedDay.hashtags}`
+          : selectedDay.caption;
 
-      const isVideo = !!(selectedDay.generatedVideoUrl || selectedDay.customMediaUrl);
-      const finalVideo = isVideo ? mapUrl(selectedDay.generatedVideoUrl || selectedDay.customMediaUrl) : undefined;
-      const finalImage = !isVideo ? mapUrl(selectedDay.generatedImageUrl) : undefined;
+        const contentType = selectedDay.contentType;
 
-      await publishToBlotato({
-        image: finalImage,
-        video: finalVideo,
-        caption: selectedDay.caption,
-        hashtags: selectedDay.hashtags,
-        contentType: isVideo ? 'Video' : selectedDay.contentType,
-        blotatoApiKey: blotatoKey,
-        dayId: selectedDay.id,
-      });
+        if (contentType === 'Photo') {
+          await publishToMeta({
+            imageUrl: selectedDay.customMediaUrl || selectedDay.generatedImageUrl,
+            caption,
+            contentType: 'Photo',
+            instagramAccountId: igAccountId!,
+            metaAccessToken: metaToken!,
+          });
+        } else if (contentType === 'Carousel') {
+          const slideUrls = (selectedDay.slides as any[])
+            ?.map((s: any) => s.generatedImageUrl)
+            .filter(Boolean) || [];
+          await publishToMeta({
+            caption,
+            contentType: 'Carousel',
+            slideImageUrls: slideUrls,
+            instagramAccountId: igAccountId!,
+            metaAccessToken: metaToken!,
+          });
+        } else if (contentType === 'Video') {
+          await publishToMeta({
+            videoUrl: selectedDay.generatedVideoUrl,
+            caption,
+            contentType: 'Video',
+            instagramAccountId: igAccountId!,
+            metaAccessToken: metaToken!,
+          });
+        }
+      } else {
+        // --- Fallback: Blotato ---
+        const blotatoKey = editedSettings.blotatoApiKey!;
+        const base = editedSettings.publicTunnelUrl || window.location.origin;
+        const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+        const mapUrl = (u?: string) => u?.startsWith('/') ? `${cleanBase}${u}` : u;
+
+        const isVideo = !!(selectedDay.generatedVideoUrl || selectedDay.customMediaUrl);
+        const finalVideo = isVideo ? mapUrl(selectedDay.generatedVideoUrl || selectedDay.customMediaUrl) : undefined;
+        const finalImage = !isVideo ? mapUrl(selectedDay.generatedImageUrl) : undefined;
+
+        await publishToBlotato({
+          image: finalImage,
+          video: finalVideo,
+          caption: selectedDay.caption,
+          hashtags: selectedDay.hashtags,
+          contentType: isVideo ? 'Video' : selectedDay.contentType,
+          blotatoApiKey: blotatoKey,
+          dayId: selectedDay.id,
+        });
+      }
 
       updateDayField('status', 'published');
     } catch (error: any) {
@@ -1119,7 +1183,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
       setIsGenerating(false);
       setGeneratingStatus('');
     }
-  }, [selectedDay, editedSettings, updateDayField]);
+  }, [selectedDay, selectedPersona, editedSettings, updateDayField]);
 
   // ============================================================================
   // Google Sheets Import
@@ -1548,7 +1612,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                   {/* Image thumbnail */}
                   {(day.generatedImageUrl || day.customMediaUrl || day.thumbnailUrl) && (
                     <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
-                      <img src={day.thumbnailUrl || day.customMediaUrl || day.generatedImageUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={driveDisplayUrl(day.thumbnailUrl || day.customMediaUrl || day.generatedImageUrl)} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </div>
                   )}
                 </div>
@@ -1729,6 +1793,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
             onGenerateVideo={handleGenerateVideo}
             onGenerateThumbnail={handleGenerateThumbnail}
             onPublish={handlePublish}
+            publishLabel={useMetaApi ? 'Publish to Instagram' : 'Publish via Blotato'}
             isGenerating={isGenerating}
             generatingStatus={generatingStatus}
             videoStatus={videoStatus[selectedDay.id]}
@@ -1778,6 +1843,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                 globalPostingTime={editedSettings.postingTime}
                 globalPostingEndTime={editedSettings.postingEndTime}
                 globalPostsPerDay={editedSettings.postsPerDay}
+                globalMetaAccessToken={editedSettings.metaAccessToken}
               />
             </motion.div>
           )}
@@ -2045,6 +2111,7 @@ function PostCard({
   onGenerateVideo,
   onGenerateThumbnail,
   onPublish,
+  publishLabel,
   isGenerating,
   generatingStatus,
   videoStatus,
@@ -2062,6 +2129,7 @@ function PostCard({
   onGenerateVideo: () => void;
   onGenerateThumbnail: () => void;
   onPublish: () => void;
+  publishLabel?: string;
   isGenerating: boolean;
   generatingStatus: string;
   videoStatus?: 'idle' | 'submitted' | 'processing' | 'done' | 'failed';
@@ -2131,13 +2199,14 @@ function PostCard({
               {/* --- PHOTO media panel --- */}
               {day.contentType === 'Photo' && (() => {
                 const photoUrl = day.customMediaUrl || day.generatedImageUrl;
+                const displayUrl = driveDisplayUrl(photoUrl);
                 const isFromDrive = !!day.customMediaUrl;
                 return (
                   <>
                     <div className="bg-gray-800/30 rounded-xl overflow-hidden">
                       {photoUrl ? (
-                        <div className="relative cursor-pointer" onClick={() => onOpenLightbox(photoUrl)}>
-                          <img src={photoUrl} alt="Preview" className="w-full aspect-[4/5] object-cover" />
+                        <div className="relative cursor-pointer" onClick={() => onOpenLightbox(displayUrl)}>
+                          <img src={displayUrl} alt="Preview" className="w-full aspect-[4/5] object-cover" referrerPolicy="no-referrer" />
                           {/* Source badge */}
                           <span className={cn(
                             'absolute top-3 right-3 text-[10px] font-semibold px-2 py-1 rounded-lg',
@@ -2263,7 +2332,7 @@ function PostCard({
                     <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Thumbnail</p>
                     {day.thumbnailUrl ? (
                       <div className="relative cursor-pointer" onClick={() => onOpenLightbox(day.thumbnailUrl!)}>
-                        <img src={day.thumbnailUrl} alt="Thumbnail" className="w-full aspect-video object-cover rounded-lg border border-gray-700" />
+                        <img src={driveDisplayUrl(day.thumbnailUrl)} alt="Thumbnail" className="w-full aspect-video object-cover rounded-lg border border-gray-700" referrerPolicy="no-referrer" />
                         <button
                           onClick={e => { e.stopPropagation(); onUpdateField('thumbnailUrl', undefined as any); }}
                           className="absolute top-2 right-2 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center hover:bg-red-500/80 transition-colors"
@@ -2295,7 +2364,7 @@ function PostCard({
                     <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Video Frame</p>
                     {day.generatedImageUrl ? (
                       <div className="relative cursor-pointer" onClick={() => onOpenLightbox(day.generatedImageUrl!)}>
-                        <img src={day.generatedImageUrl} alt="Video frame" className="w-full aspect-video object-cover rounded-lg border border-gray-700" />
+                        <img src={driveDisplayUrl(day.generatedImageUrl)} alt="Video frame" className="w-full aspect-video object-cover rounded-lg border border-gray-700" referrerPolicy="no-referrer" />
                         {day.styleOption && (
                           <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-medium px-2 py-0.5 rounded-lg flex items-center gap-1">
                             <Camera className="w-3 h-3" /> {day.styleOption}
@@ -2384,7 +2453,7 @@ function PostCard({
                     </div>
                     {day.status === 'completed' && day.isGoodToPost && (
                       <button onClick={onPublish} disabled={isGenerating} className="w-full px-5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-sm font-semibold text-white transition-colors flex items-center justify-center gap-2">
-                        {isGenerating && generatingStatus === 'Publishing...' ? <><Loader2 className="w-4 h-4 animate-spin" /> Publishing...</> : <><Send className="w-4 h-4" /> Publish to Instagram</>}
+                        {isGenerating && generatingStatus === 'Publishing...' ? <><Loader2 className="w-4 h-4 animate-spin" /> Publishing...</> : <><Send className="w-4 h-4" /> {publishLabel || 'Publish to Instagram'}</>}
                       </button>
                     )}
                     <button onClick={onDelete} className="flex items-center gap-1.5 text-xs text-red-400/60 hover:text-red-400 transition-colors mx-auto pt-2">
@@ -2920,7 +2989,7 @@ function CalendarGrid({
                       </button>
                     )}
                     {post.generatedImageUrl ? (
-                      <img src={post.generatedImageUrl} alt="" className="w-full aspect-square rounded object-cover" />
+                      <img src={driveDisplayUrl(post.customMediaUrl || post.generatedImageUrl)} alt="" className="w-full aspect-square rounded object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       <div className={cn(
                         'w-full h-6 rounded text-[9px] font-medium flex items-center justify-center truncate px-1',
@@ -2961,6 +3030,7 @@ function PersonaEditorPanel({
   globalPostingTime,
   globalPostingEndTime,
   globalPostsPerDay,
+  globalMetaAccessToken,
 }: {
   persona: Persona;
   onUpdateField: (path: string, value: any) => void;
@@ -2978,6 +3048,7 @@ function PersonaEditorPanel({
   globalPostingTime?: string;
   globalPostingEndTime?: string;
   globalPostsPerDay?: number;
+  globalMetaAccessToken?: string;
 }) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tab, setTab] = useState<'profile' | 'friends' | 'audience' | 'settings'>('profile');
@@ -3763,6 +3834,32 @@ Return a JSON array of 3 segments.`;
               );
             })()}
           </Section>
+
+          <Section title="Meta / Instagram">
+            <Field label="Instagram Account ID">
+              <input
+                type="text"
+                value={p.instagramAccountId ?? ''}
+                onChange={e => onUpdateField('instagramAccountId', e.target.value)}
+                className="input-field"
+                placeholder="17841400..."
+              />
+            </Field>
+            <Field label="Facebook Page ID" className="mt-3">
+              <input
+                type="text"
+                value={p.facebookPageId ?? ''}
+                onChange={e => onUpdateField('facebookPageId', e.target.value)}
+                className="input-field"
+                placeholder="Page ID"
+              />
+            </Field>
+            <p className="text-[10px] text-gray-500 mt-2 px-1">Find your Instagram Account ID in Meta Business Suite. Required for direct Meta Graph API publishing.</p>
+            <TestMetaConnectionButton
+              instagramAccountId={p.instagramAccountId}
+              metaAccessToken={globalMetaAccessToken}
+            />
+          </Section>
         </div>
       )}
 
@@ -3879,7 +3976,131 @@ function TagList({ items, onUpdate, accent = 'gray' }: { items: string[]; onUpda
 }
 
 // ============================================================================
+// Test Meta Connection Button (used in PersonaEditorPanel)
+// ============================================================================
+
+function TestMetaConnectionButton({
+  instagramAccountId,
+  metaAccessToken,
+}: {
+  instagramAccountId?: string;
+  metaAccessToken?: string;
+}) {
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; name?: string; username?: string; error?: string } | null>(null);
+
+  const handleTest = async () => {
+    if (!instagramAccountId || !metaAccessToken) {
+      setResult({ success: false, error: 'Instagram Account ID and Meta Access Token are both required.' });
+      return;
+    }
+    setTesting(true);
+    setResult(null);
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/v21.0/${instagramAccountId}?fields=name,username&access_token=${metaAccessToken}`
+      );
+      const data = await res.json();
+      if (data.error) {
+        setResult({ success: false, error: data.error.message });
+      } else {
+        setResult({ success: true, name: data.name, username: data.username });
+      }
+    } catch (err: any) {
+      setResult({ success: false, error: err.message });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="mt-3">
+      <button
+        onClick={handleTest}
+        disabled={testing}
+        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-xs font-medium text-gray-300 transition-colors"
+      >
+        {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+        Test Connection
+      </button>
+      {result && (
+        <div className={cn('mt-2 px-3 py-2 rounded-lg text-xs', result.success ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300')}>
+          {result.success
+            ? `Connected: @${result.username} (${result.name})`
+            : `Error: ${result.error}`
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // Settings Panel
+function DiscoverAccountsButton({ token }: { token: string }) {
+  const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState<any[] | null>(null);
+  const [error, setError] = useState('');
+
+  const handleDiscover = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await discoverMetaAccounts(token);
+      setAccounts(result.accounts || []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to discover accounts');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="mt-3 space-y-2">
+      <button
+        onClick={handleDiscover}
+        disabled={loading}
+        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-xs font-medium text-gray-300 transition-colors"
+      >
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+        Discover Instagram Accounts
+      </button>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+      {accounts && accounts.length === 0 && (
+        <p className="text-xs text-gray-500">No Facebook Pages found. Make sure your token has pages_manage_posts permission.</p>
+      )}
+      {accounts && accounts.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] text-gray-500">Copy the Instagram Account ID into each persona's Settings tab:</p>
+          {accounts.map((acc, i) => (
+            <div key={i} className="bg-gray-800/50 rounded-lg p-3 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-white">{acc.facebookPageName}</span>
+                <span className={acc.instagramAccountId ? 'text-emerald-400' : 'text-gray-500'}>{acc.status}</span>
+              </div>
+              {acc.instagramAccountId && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">IG:</span>
+                    <span className="text-white font-mono">@{acc.instagramUsername}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">Account ID:</span>
+                    <code className="text-rose-400 font-mono bg-gray-900 px-1.5 py-0.5 rounded select-all">{acc.instagramAccountId}</code>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">Page ID:</span>
+                    <code className="text-gray-300 font-mono bg-gray-900 px-1.5 py-0.5 rounded select-all">{acc.facebookPageId}</code>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================================================
 
 function SettingsPanel({
@@ -3959,6 +4180,32 @@ function SettingsPanel({
             placeholder="blot-..."
           />
         </Field>
+      </Section>
+
+      {/* Meta / Instagram API */}
+      <Section title="Meta / Instagram API">
+        <Field label="Meta Access Token">
+          <input
+            type="password"
+            value={settings.metaAccessToken ?? ''}
+            onChange={e => onUpdateField('metaAccessToken', e.target.value)}
+            className="input-field"
+            placeholder="System User Token"
+          />
+        </Field>
+        <Field label="Meta App ID" className="mt-3">
+          <input
+            type="text"
+            value={settings.metaAppId ?? ''}
+            onChange={e => onUpdateField('metaAppId', e.target.value)}
+            className="input-field"
+            placeholder="App ID"
+          />
+        </Field>
+        <p className="text-[10px] text-gray-500 mt-2 px-1">Get your System User Token from Meta Business Manager.</p>
+        {settings.metaAccessToken && (
+          <DiscoverAccountsButton token={settings.metaAccessToken} />
+        )}
       </Section>
 
       {/* Tunnel */}

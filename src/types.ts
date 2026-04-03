@@ -64,6 +64,9 @@ export interface Persona {
   postingTime?: string;
   postingEndTime?: string;
   postsPerDay?: number;
+  // Meta API — per persona Instagram connection
+  instagramAccountId?: string;
+  facebookPageId?: string;
 }
 
 export interface PersonaFriend {
@@ -184,6 +187,9 @@ export interface UserSettings {
   postingEndTime?: string;
   postsPerDay?: number;
   publicTunnelUrl?: string;
+  // Meta Graph API
+  metaAccessToken?: string;
+  metaAppId?: string;
 }
 
 // --- Drive Asset ---

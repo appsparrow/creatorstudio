@@ -82,6 +82,23 @@ export const saveVideo = (videoUrl: string, personaId?: string) =>
     body: JSON.stringify({ videoUrl, personaId }),
   });
 
+// ===== Meta Graph API =====
+export const discoverMetaAccounts = (token: string) =>
+  apiFetch<{ accounts: any[]; hint: string }>(`/api/meta/accounts?token=${encodeURIComponent(token)}`);
+
+export const publishToMeta = (params: {
+  imageUrl?: string;
+  videoUrl?: string;
+  caption: string;
+  contentType: string;
+  slideImageUrls?: string[];
+  instagramAccountId: string;
+  metaAccessToken: string;
+}) => apiFetch('/api/meta/publish', {
+  method: 'POST',
+  body: JSON.stringify(params),
+});
+
 // ===== Blotato Publishing =====
 export const publishToBlotato = (params: {
   image?: string;

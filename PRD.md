@@ -442,4 +442,66 @@ interface UserSettings {
 
 ---
 
-*This PRD reflects Creator Studio as of March 30, 2026 — Version 2.0 rebuild with canvas workspace, AI-first content creation, target audience integration, and visual persona cards.*
+## 8. Feature Inventory & Metrics
+
+### 8.1 Feature Count by Category
+
+| Category | Features | Complexity |
+|----------|----------|------------|
+| **Authentication & Account** | Email/password sign-in/sign-up, session persistence, auth token injection, user profile, sign-out | 5 features · Low |
+| **Persona Management** | Visual card editor, AI persona generation from prompt, 4-tab editor (Profile/Friends/Audience/Settings), reference image upload with primary selection, thumbnail style references, social handles, AI analysis/consistency rules, inline click-to-edit, colored tag system, danger zone deletion | 10 features · High |
+| **Friends & Companions** | Up to 6 friends per persona, photo upload, name/relationship/traits/profession, active/inactive toggle, friend image upload to R2, friends injected into AI generation prompts, diversity enforcement rules | 7 features · Medium |
+| **Target Audience System** | Up to 6 segments per persona, AI-generated audience suggestions, pain points/aspirations/resonance notes, active/inactive toggle, content themes management, audience selection in post creation, audience-aware caption generation | 7 features · High |
+| **Post Creation (AI-First)** | Prompt-driven creation, target audience selector (visual cards), content focus tag selector, AI generates ALL fields for ALL 3 content types in one prompt, story arc tagging (5 arcs), caption tone selection (5 tones), auto-save with debounce | 7 features · High |
+| **Post Editor** | Visual post card (not form), content type tabs (Photo/Carousel/Video), two-column layout, inline click-to-edit, published post locking (view-only + duplicate), on-screen text position selector with live preview, date picker, status badges | 8 features · High |
+| **Photo Posts** | Scene description, on-screen text overlay, text position (top/middle/bottom), position preview on image, generate/regenerate, Drive media selection, source badges (AI/Drive) | 7 features · Medium |
+| **Carousel Posts** | 4+ numbered slide cards, per-slide scene + overlay text, generate all slides (sequential consistency), slide thumbnail selector, add slide, mix Drive + AI, multi-select from Drive | 7 features · High |
+| **Video Posts** | Hook section, thumbnail concept, camera angle selector (8 angles), audio/music suggestion, thumbnail generation from style references, generate image → generate video pipeline, thumbnail preview | 7 features · High |
+| **Image Generation** | NanoBanana API (primary), Gemini fallback, persona reference images for consistency, AI analysis rules enforcement, text overlay compositing (browser canvas), 3 position options, saves to Cloudflare R2, carousel consistency (first slide as reference), diversity rules for supporting characters, friends as named characters | 10 features · Very High |
+| **Video Generation** | Kling AI (4 model variants), 8 camera angle presets, 10-second polling (16 min timeout), webhook callback support, video save to R2, task ID mapping | 6 features · High |
+| **Thumbnail Generation** | Per-persona thumbnail style references, AI thumbnail generation, close-up/expressive composition prompting, separate thumbnail URL storage | 4 features · Medium |
+| **Google Drive Integration** | Per-persona Drive folder, sync files with thumbnails, Drive picker modal (single/multi select), content type filtering, file size display, Drive URL → displayable thumbnail conversion, mix Drive + AI media, referrerPolicy handling | 8 features · High |
+| **Content Calendar** | Monthly grid view, image thumbnails per day, drag-and-drop rescheduling, published post locking (lock badge), duplicate button on published posts (Copy suffix + today's date), month navigation, click to select | 7 features · Medium |
+| **Sidebar Navigation** | Persona rail with avatar circles, content sidebar with post list, date boxes, status badges, content type icons (Photo/Video/Carousel), platform letters, drag-and-drop reorder (date swapping), hover drag affordance on date box, saving indicator | 9 features · Medium |
+| **Publishing** | Blotato API → Instagram, photos as posts, videos as Reels, hashtag limiting (5 max), media upload to Blotato, account auto-detection | 6 features · Medium |
+| **Scheduling** | Per-persona posting mode (manual/auto), posts per day, start/end time, distributed time slot calculator with display, good-to-post workflow flag | 5 features · Medium |
+| **Settings** | Global API keys (NanoBanana, Kling key+secret, Blotato), network tunnel URL, per-persona Drive folder, per-persona posting schedule, explicit save button, user account section | 6 features · Low |
+| **Import** | Google Sheets import, configurable Sheet ID + sheet name, start date, posts per day, duplicate avoidance, column mapping to ContentDay fields | 6 features · Medium |
+| **Confirmation System** | Custom ConfirmModal component (not browser dialogs), danger variant (red) + default variant (white), animated entrance, used for all destructive actions (7 confirm points) | 2 features · Low |
+| **UX & Polish** | Mobile responsive (collapsible sidebar, stacked layout, mobile top bar), dark theme (B&W + rose accents), custom logo/favicon, full-screen image lightbox, blur effect when panels open, auto-save (1-second debounce), InlineEdit component, TagList component, StatRow component | 9 features · Medium |
+| **Infrastructure** | Cloudflare Workers (Hono), Cloudflare Pages, Cloudflare R2 (zero egress), Supabase PostgreSQL with RLS, Supabase Auth, camelCase↔snake_case conversion, 16 API endpoints, R2 media serving route | 8 features · High |
+
+### 8.2 Summary
+
+| Metric | Value |
+|--------|-------|
+| **Total Features** | **~152** |
+| **Production Code** | **~6,650 lines** (TypeScript) |
+| **API Endpoints** | **16** |
+| **AI Service Integrations** | **5** (Gemini text, Gemini image, NanoBanana, Kling, Blotato) |
+| **Data Models** | **7** (Persona, Friend, TargetAudience, ContentDay, CarouselSlide, FeaturedProduct, UserSettings) |
+| **Database Tables** | **5** (personas, days, video_tasks, drive_assets, user_settings) |
+| **External Integrations** | **7** (Supabase, Cloudflare Workers, Cloudflare R2, Google Drive API, NanoBanana, Kling AI, Blotato) |
+
+---
+
+## 9. Pending / Upcoming Features
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Products/Affiliates Catalog** | Per-persona product library with visual descriptions for AI prompt injection | P1 |
+| **Product Picker per Post** | Attach products to posts, inject into image prompts and captions | P1 |
+| **Facebook/Instagram Direct API** | Replace Blotato with direct Meta Graph API posting | P1 |
+| **TikTok Publishing** | Direct TikTok API integration | P2 |
+| **Storyline View** | Visual timeline showing narrative progression across posts | P2 |
+| **Content Mix Dashboard** | % breakdown of story arcs + audience coverage analytics | P2 |
+| **Light Mode Theme** | Alternate light theme option | P2 |
+| **Supabase Realtime** | Replace video polling with realtime subscriptions | P3 |
+| **Cloudflare Cron** | Move auto-scheduler from client to server-side cron | P3 |
+| **Multi-user / Team** | Roles (creator/reviewer/publisher), approval workflows | P3 |
+
+---
+
+*This PRD reflects Creator Studio as of March 31, 2026 — Version 2.1 with 152+ features, deployed on Cloudflare (Pages + Workers + R2), Supabase PostgreSQL, and 5 AI service integrations.*
+
+*For build cost analysis and team estimation, see [docs/build-cost-analysis.md](docs/build-cost-analysis.md).*
