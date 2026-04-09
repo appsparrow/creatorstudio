@@ -1650,9 +1650,9 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="border-b border-gray-800 bg-gradient-to-b from-gray-900/80 to-gray-950/60 backdrop-blur-sm px-4 md:px-6 py-5"
+              className="absolute inset-0 z-10 overflow-y-auto bg-gradient-to-b from-gray-900/80 to-gray-950/60 backdrop-blur-sm px-4 md:px-6 py-5"
             >
-              <div className="max-w-3xl mx-auto space-y-4">
+              <div className="max-w-3xl mx-auto space-y-4 py-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-white flex items-center gap-2">

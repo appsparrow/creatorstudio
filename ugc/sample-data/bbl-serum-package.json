@@ -1,0 +1,349 @@
+{
+  "id": "run_20260409_001",
+  "personaId": "sofia_laurent",
+  "productUrl": "https://amazon.com/dp/B0GG7H8Y52",
+  "mode": "hitl",
+  "status": "complete",
+  "startedAt": "2026-04-09T18:30:00Z",
+  "completedAt": "2026-04-09T18:31:02Z",
+
+  "productIntel": {
+    "productName": "BBL Serum – 3-in-1 Bikini Line Care",
+    "brand": "The Bikini Line Co.",
+    "category": "beauty_body",
+    "subcategory": "intimate_skincare",
+    "price": 19.99,
+    "currency": "USD",
+    "size": "1.7 fl oz",
+    "keyFeatures": [
+      "3-in-1 formula",
+      "Salicylic Acid",
+      "Niacinamide",
+      "Kojic Acid",
+      "Aloe Vera",
+      "Fragrance-free",
+      "Designed for sensitive skin",
+      "Post-hair removal care"
+    ],
+    "primaryBenefit": "Reduces ingrown bumps, fades dark spots, calms irritation after shaving/waxing",
+    "painPointsSolved": [
+      "ingrown hairs",
+      "bikini line darkening/hyperpigmentation",
+      "razor bumps",
+      "post-wax irritation",
+      "sensitive skin irritation"
+    ],
+    "reviewSentiment": {
+      "positive": [
+        "clears ingrowns within a week",
+        "lightens dark spots on thighs and bikini line",
+        "huge reduction in irritation",
+        "lightweight/non-greasy"
+      ],
+      "negative": [
+        "takes 14-21 days for full results",
+        "small bottle for the price"
+      ]
+    },
+    "competitorProducts": [
+      { "name": "European Wax Center Ingrown Hair Serum", "price": 29.00 },
+      { "name": "Fur Ingrown Concentrate", "price": 32.00 },
+      { "name": "Tend Skin Solution", "price": 16.00 }
+    ],
+    "targetAudience": "Women 18-35 who shave/wax bikini area, deal with ingrowns and hyperpigmentation",
+    "trendingStatus": true,
+    "sourceUrl": "https://amazon.com/dp/B0GG7H8Y52"
+  },
+
+  "strategy": {
+    "hookFormat": "price_reveal",
+    "hookRationale": "Product is $19.99 (under $20), creates impulse trigger. Price advantage over competitors ($29-$32) strengthens the value angle.",
+    "contentFormat": "product_demo",
+    "contentRationale": "Body care product needs visual proof of texture and application to build trust",
+    "videoLength": "20s",
+    "setting": "bathroom_vanity",
+    "characterOutfit": "cream ribbed tank top, hair pulled back in loose low bun, spa-day aesthetic",
+    "optimalPostingTime": "7:15 PM EST Tuesday",
+    "postingRationale": "Beauty/body care content peaks during evening self-care hours. Tuesday evening captures mid-week planning mindset.",
+    "hashtagStrategy": {
+      "primary": "#bikinilinecare",
+      "conversion": "#tiktokmademebuyit",
+      "product": "#bblserum",
+      "brand": "#thebikinilineco",
+      "modifier": "#darkspotremoval"
+    }
+  },
+
+  "script": {
+    "hookVariants": [
+      {
+        "hook": "Under twenty dollars fixed my bikini line nightmare",
+        "score": 9,
+        "rationale": "Price anchor + 'nightmare' is visceral emotional trigger"
+      },
+      {
+        "hook": "POV your bikini line bumps vanish in one week",
+        "score": 9,
+        "rationale": "Time-specific claim backed by reviews. POV format native to TikTok."
+      },
+      {
+        "hook": "This twenty dollar serum replaced my thirty dollar one",
+        "score": 9,
+        "rationale": "Direct competitor price comparison creates instant value perception"
+      },
+      {
+        "hook": "Stop shaving your bikini line until you hear this",
+        "score": 9,
+        "rationale": "Pattern interrupt — commands the viewer to stop. High curiosity gap."
+      },
+      {
+        "hook": "I cleared my ingrowns for under twenty dollars",
+        "score": 8,
+        "rationale": "First-person proof + price anchor. Slightly less dramatic scroll-stop."
+      },
+      {
+        "hook": "Nobody talks about why your bikini line darkens",
+        "score": 9,
+        "rationale": "Taboo + education angle. 'Nobody talks about' is a proven scroll-stop phrase."
+      },
+      {
+        "hook": "Three skin problems one twenty dollar serum",
+        "score": 6,
+        "rationale": "Efficient but too listicle-like. Lacks emotional punch."
+      },
+      {
+        "hook": "POV you finally wear a bikini without thinking twice",
+        "score": 7,
+        "rationale": "Strong aspiration but slightly over word target and low specificity."
+      },
+      {
+        "hook": "Dermatologists put these three acids in one serum",
+        "score": 7,
+        "rationale": "Authority angle but lacks the personal pain point emotional trigger."
+      },
+      {
+        "hook": "Under twenty dollars and my razor bumps are gone",
+        "score": 9,
+        "rationale": "Price-first with specific problem and resolution. Clean and direct."
+      }
+    ],
+    "selectedHook": "Under twenty dollars fixed my bikini line nightmare",
+    "fullScript": {
+      "hookSection": {
+        "timing": "0-2s",
+        "wordCount": 8,
+        "textOverlay": "UNDER $20",
+        "voiceover": "[curious] Under twenty dollars fixed my bikini line nightmare.",
+        "visualCue": "Sofia in bathroom, holds up BBL Serum bottle close to camera, eyebrows raised, natural lighting."
+      },
+      "productSection": {
+        "timing": "2-14s",
+        "wordCount": 33,
+        "textOverlay": "Salicylic Acid + Niacinamide + Kojic Acid | $19.99 on TikTok Shop",
+        "voiceover": "[calm] This is the BBL Serum — salicylic acid, niacinamide, and kojic acid in one fragrance-free bottle. It fades dark spots, kills ingrowns, and calms irritation after every single shave. Under twenty dollars on TikTok Shop.",
+        "visualCue": "Sofia tilts bottle to show ingredients label, then applies a small pump to fingertips. Cut to close-up of lightweight serum texture absorbing into skin."
+      },
+      "trustSection": {
+        "timing": "14-18s",
+        "wordCount": 16,
+        "textOverlay": "~2 weeks for dark spots | ingrowns gone in DAYS",
+        "voiceover": "[playfully] Full transparency — it took about two weeks for dark spots. But the ingrowns? Gone in days.",
+        "visualCue": "Sofia shrugs lightly with a half-smile on 'two weeks,' then leans into camera with a knowing nod on 'gone in days.'"
+      },
+      "ctaSection": {
+        "timing": "18-20s",
+        "wordCount": 9,
+        "textOverlay": "LINK IN BIO / TAP BELOW",
+        "voiceover": "[calm] Link is right here — grab it before summer.",
+        "visualCue": "Sofia taps the bottle twice, then points down toward the TikTok Shop link area. Bottle centered in frame."
+      }
+    },
+    "totalWordCount": 63,
+    "estimatedDuration": "20s",
+    "elevenlabsFullScript": "[curious] Under twenty dollars fixed my bikini line nightmare. [calm] This is the BBL Serum — salicylic acid, niacinamide, and kojic acid in one fragrance-free bottle. It fades dark spots, kills ingrowns, and calms irritation after every single shave. Under twenty dollars on TikTok Shop. [playfully] Full transparency — it took about two weeks for dark spots. But the ingrowns? Gone in days. [calm] Link is right here — grab it before summer.",
+    "elevenlabsSettings": {
+      "voiceStability": 0.42,
+      "voiceClarity": 0.78,
+      "style": "conversational_ugc",
+      "speed": 1.05
+    }
+  },
+
+  "visuals": {
+    "baseCharacterPrompt": "Photorealistic French woman with Mediterranean features, late twenties (27-29), warm olive skin tone, shoulder-length dark chestnut brown hair with natural wave pulled back casually in a loose low bun, minimal makeup with defined brows, soft diffused natural window lighting from the left, neutral clean bathroom background with white marble vanity, UGC content creator aesthetic, iPhone 14 Pro quality realism, high resolution, natural skin texture with subtle freckles, authentic lifestyle photography, wearing a neutral-toned cream ribbed tank top, spa-day self-care aesthetic",
+    "shotPrompts": [
+      {
+        "shotId": "shot_1_hook",
+        "timing": "0-2s",
+        "purpose": "hook_frame",
+        "fullPrompt": "Photorealistic French woman with Mediterranean features, late twenties (27-29), warm olive skin tone, shoulder-length dark chestnut brown hair with natural wave pulled back casually in a loose low bun, minimal makeup with defined brows, soft diffused natural window lighting from the left, neutral clean bathroom background with white marble vanity, looking directly at camera with warm confident expression shifting to raised eyebrows and surprised curious look, UGC content creator aesthetic, iPhone 14 Pro quality realism, high resolution, natural skin texture with subtle freckles, authentic lifestyle photography, wearing a neutral-toned cream ribbed tank top, spa-day self-care aesthetic, she is holding up a small sleek minimalist serum bottle labeled BBL Serum close to the camera lens at eye level with her right hand, the bottle is sharply in focus in the foreground with her face slightly soft behind it, bottle tilted slightly toward viewer showing the label clearly, her left hand is open palm-up in a questioning gesture, mouth slightly open in a playful surprised expression, vertical 9:16 portrait orientation, shallow depth of field, soft white towels and a small green plant blurred in the background on the marble counter, warm golden-hour window light casting soft shadows, candid selfie-style framing shot from chest up, authentic unpolished social media video still aesthetic",
+        "compositionNotes": "Product 40% of frame upper-right third, face center-left, shallow DOF, space at top for text overlay",
+        "lighting": "Soft diffused natural window light from camera-left, warm ~5500K",
+        "props": ["BBL Serum bottle", "white marble countertop", "soft white towels", "small green plant"]
+      },
+      {
+        "shotId": "shot_2_demo",
+        "timing": "2-8s",
+        "purpose": "product_demo",
+        "fullPrompt": "Photorealistic French woman with Mediterranean features, late twenties (27-29), warm olive skin tone, shoulder-length dark chestnut brown hair with natural wave pulled back casually in a loose low bun, minimal makeup with defined brows, soft diffused natural window lighting from the left, neutral clean bathroom background with white marble vanity, looking directly at camera with warm confident expression, UGC content creator aesthetic, iPhone 14 Pro quality realism, high resolution, natural skin texture with subtle freckles, authentic lifestyle photography, wearing a neutral-toned cream ribbed tank top, spa-day self-care aesthetic, she is pressing the pump of a small sleek minimalist serum bottle labeled BBL Serum with her left hand while her right hand is held open with fingertips together catching a small drop of lightweight clear translucent serum on her fingertip pads, her gaze is directed down at her fingertips showing the product texture with a focused gentle half-smile, camera framed from mid-chest up with both hands visible in the center of frame, the serum on her fingers catches the light showing a glossy dewy texture, vertical 9:16 portrait orientation, shallow depth of field focused on her hands and the product, white marble counter surface visible below, soft white towels in background, warm natural window light from the left illuminating the serum droplet, candid demonstration moment, authentic unpolished social media video still aesthetic",
+        "compositionNotes": "Hands center frame, focal triangle: face (top), bottle (lower-left), serum on fingertips (lower-right)",
+        "lighting": "Soft diffused window light from camera-left, specular highlight on serum droplet",
+        "props": ["BBL Serum bottle with pump depressed", "visible serum drop on fingertips", "white marble countertop"]
+      },
+      {
+        "shotId": "shot_3_closeup",
+        "timing": "8-10s",
+        "purpose": "product_detail",
+        "fullPrompt": "Photorealistic close-up product photography of a small sleek minimalist serum bottle labeled BBL Serum by The Bikini Line Co sitting on a clean white marble bathroom counter, a woman's hand with warm olive skin tone and natural short nails is gently resting on the pump top of the bottle with fingertips about to press down, the bottle label is fully visible and facing camera, soft diffused natural window lighting from the left, UGC content creator aesthetic, iPhone 14 Pro quality realism, high resolution, authentic lifestyle product photography, the marble surface has subtle natural gray veining, a soft folded white towel is placed neatly to the right of the bottle, a small sprig of eucalyptus or green plant leaf sits to the left as a styling element, very shallow depth of field with the bottle label in tack-sharp focus, background is a clean neutral bathroom blurred into soft creamy bokeh, vertical 9:16 portrait orientation, the bottle is centered in the lower two-thirds of the frame leaving the upper third as clean negative space, warm golden natural light creating a soft glow on the bottle surface, spa-day self-care bathroom aesthetic, shot from slightly above at approximately 30 degree angle looking down at the counter surface, natural skin texture with subtle freckles visible on the hand",
+        "compositionNotes": "Product dead-center lower two-thirds, upper third clean for text overlay, 30-degree overhead angle",
+        "lighting": "Soft diffused window light from camera-left, gentle gradient on bottle, specular catch on pump",
+        "props": ["BBL Serum bottle label facing camera", "white marble counter", "folded white towel", "eucalyptus sprig"]
+      },
+      {
+        "shotId": "shot_4_reaction",
+        "timing": "10-16s",
+        "purpose": "reaction_proof",
+        "fullPrompt": "Photorealistic French woman with Mediterranean features, late twenties (27-29), warm olive skin tone, shoulder-length dark chestnut brown hair with natural wave pulled back casually in a loose low bun, minimal makeup with defined brows, soft diffused natural window lighting from the left, neutral clean bathroom background with white marble vanity, UGC content creator aesthetic, iPhone 14 Pro quality realism, high resolution, natural skin texture with subtle freckles, authentic lifestyle photography, wearing a neutral-toned cream ribbed tank top, spa-day self-care aesthetic, she is leaning slightly forward toward the camera with a knowing confident half-smile and one shoulder slightly raised in a casual shrug gesture, her expression is genuinely pleased and slightly conspiratorial as if sharing a secret with a close friend, her eyes are warm and engaged looking directly into the camera lens, the small sleek minimalist serum bottle labeled BBL Serum is visible on the white marble counter in the lower foreground slightly out of focus, framed from chest up with her face in the upper third of the frame, vertical 9:16 portrait orientation, shallow depth of field focused on her face and expression, soft white towels and a small green plant visible in the blurred background, warm natural golden window light from the left creating flattering soft shadows on her face, candid reaction moment captured mid-gesture, authentic unpolished social media video still aesthetic, her body language is relaxed open and approachable",
+        "compositionNotes": "Face upper-center, forward lean creates intimacy, BBL Serum in lower-left foreground soft",
+        "lighting": "Soft diffused window light from camera-left, luminous quality from forward lean, warm catchlights in eyes",
+        "props": ["BBL Serum bottle in foreground", "white marble countertop", "white towels", "green plant"]
+      },
+      {
+        "shotId": "shot_5_cta",
+        "timing": "16-20s",
+        "purpose": "call_to_action",
+        "fullPrompt": "Photorealistic French woman with Mediterranean features, late twenties (27-29), warm olive skin tone, shoulder-length dark chestnut brown hair with natural wave pulled back casually in a loose low bun, minimal makeup with defined brows, soft diffused natural window lighting from the left, neutral clean bathroom background with white marble vanity, looking directly at camera with a warm inviting confident smile, UGC content creator aesthetic, iPhone 14 Pro quality realism, high resolution, natural skin texture with subtle freckles, authentic lifestyle photography, wearing a neutral-toned cream ribbed tank top, spa-day self-care aesthetic, she is holding a small sleek minimalist serum bottle labeled BBL Serum centered in front of her chest at mid-frame with her left hand while her right index finger is pointing downward toward the bottom of the frame in a clear call-to-action gesture, her right hand fingertip is tapping on the bottle with a deliberate playful gesture, her smile is warm genuine and encouraging as if inviting the viewer to take action, the bottle label is clearly visible and facing the camera, framed from waist up with the bottle perfectly centered in the middle of the frame, vertical 9:16 portrait orientation, medium depth of field keeping both her face and the bottle in sharp focus, white marble counter surface visible at the bottom edge of the frame, soft white towels and a small green plant in the blurred background, warm natural golden window light from the left, the overall energy is friendly direct and encouraging, authentic unpolished social media video still aesthetic, generous space left at the bottom of the frame below her pointing finger for text overlay or link placement",
+        "compositionNotes": "Bottle dead-center at chest, pointing-down gesture toward link area, generous bottom space for overlay",
+        "lighting": "Consistent soft diffused window light, both face and bottle well-lit, medium DOF",
+        "props": ["BBL Serum bottle centered label visible", "white marble countertop", "white towels", "green plant"]
+      }
+    ],
+    "consistencyChecklist": [
+      "Same face structure across all 5 shots",
+      "Identical hair: dark chestnut brown, loose low bun",
+      "Consistent warm olive skin tone",
+      "Same cream ribbed tank top in all shots",
+      "Same bathroom setting: white marble, towels, plant",
+      "Consistent soft window light from camera-left",
+      "Natural progression: curious → focused → pleased → inviting"
+    ],
+    "imageGenerationSettings": {
+      "platform": "freepik",
+      "resolution": "1080x1920",
+      "aspectRatio": "9:16",
+      "quality": "high",
+      "style": "photorealistic_ugc"
+    }
+  },
+
+  "audio": {
+    "elevenlabsPayload": {
+      "voiceId": "CONFIGURE_IN_ELEVENLABS",
+      "text": "[curious] Under twenty dollars fixed my bikini line nightmare. [calm] This is the BBL Serum — salicylic acid, niacinamide, and kojic acid in one fragrance-free bottle. It fades dark spots, kills ingrowns, and calms irritation after every single shave. Under twenty dollars on TikTok Shop. [playfully] Full transparency — it took about two weeks for dark spots. But the ingrowns? Gone in days. [calm] Link is right here — grab it before summer.",
+      "voiceSettings": {
+        "stability": 0.42,
+        "similarityBoost": 0.78,
+        "style": 0.35,
+        "useSpeakerBoost": true
+      },
+      "outputFormat": "mp3_44100_192",
+      "speed": 1.05,
+      "recommendedStockVoice": {
+        "name": "Charlotte",
+        "voiceId": "XB0fDUnXU5powFXDhCwa"
+      }
+    },
+    "trendingSoundOptions": [
+      {
+        "soundName": "Aesthetic Soft Girl Morning",
+        "categoryFit": "beauty_routine_asmr",
+        "recommended": true,
+        "notes": "Soft lo-fi piano loop. Dominates beauty/skincare GRWM content. Pairs perfectly without competing with voiceover."
+      },
+      {
+        "soundName": "That Girl Era (slowed)",
+        "categoryFit": "clean_girl_aesthetic",
+        "recommended": false,
+        "notes": "Slowed R&B-pop instrumental. Trending in bikini-prep content. Creates luxurious feel that elevates a sub-$20 product."
+      },
+      {
+        "soundName": "No music — raw UGC",
+        "categoryFit": "raw_ugc_testimonial",
+        "recommended": false,
+        "notes": "No background music, room tone only. Highest conversion for TikTok Shop ads. Maximally authentic."
+      }
+    ],
+    "audioMixingInstructions": {
+      "voiceoverVolume": "100%",
+      "backgroundSoundVolume": "25-30%",
+      "fadeInDuration": "0.8s",
+      "fadeOutDuration": "1.5s",
+      "voiceoverPriority": true,
+      "duckingEnabled": true,
+      "duckAmountDb": -6
+    },
+    "finalAudioSpecs": {
+      "totalDuration": "20s",
+      "format": "m4a",
+      "sampleRate": "44100 Hz",
+      "bitrate": "256 kbps",
+      "channels": "mono",
+      "loudnessTarget": "-14 LUFS"
+    }
+  },
+
+  "metadata": {
+    "tiktok": {
+      "title": "Under twenty dollars fixed my bikini line nightmare — BBL Serum by The Bikini Line Co. #bblserum #skincare",
+      "titleCharCount": 107,
+      "caption": "I tried everything for ingrowns and dark spots on my bikini line.\nThis $19.99 serum has salicylic acid, niacinamide, and kojic acid — fragrance-free and made for sensitive skin.\nThree weeks in and the difference is unreal\nLink in bio — you need this before summer.",
+      "captionCharCount": 264,
+      "hashtags": [
+        { "tag": "#bikinilinecare", "type": "primary_niche", "rationale": "Direct product category reach" },
+        { "tag": "#tiktokmademebuyit", "type": "conversion", "rationale": "Mandatory purchase intent signal" },
+        { "tag": "#bblserum", "type": "product_specific", "rationale": "Branded hashtag already trending" },
+        { "tag": "#thebikinilineco", "type": "brand_tag", "rationale": "Official brand for search presence" },
+        { "tag": "#darkspotremoval", "type": "modifier", "rationale": "Captures hyperpigmentation audience" }
+      ],
+      "productTags": [
+        {
+          "productName": "BBL Serum – 3-in-1 Bikini Line Care",
+          "variant": "1.7 fl oz",
+          "price": "$19.99",
+          "tagPlacement": "bottom_left",
+          "tagTiming": "appears_at_3s"
+        }
+      ],
+      "postingSchedule": {
+        "optimalTime": "7:15 PM EST",
+        "dayOfWeek": "Tuesday",
+        "rationale": "Beauty/body care peaks during evening self-care hours. Tuesday captures mid-week planning mindset.",
+        "backupTimes": ["12:30 PM EST Thursday", "10:00 AM EST Sunday"]
+      },
+      "engagementStrategy": {
+        "pinComment": "Be honest — what's your biggest bikini line struggle, ingrowns or dark spots?",
+        "autoReplyTriggers": [
+          { "keyword": "link", "response": "Just dropped the link in my bio! The BBL Serum is $19.99 on TikTok Shop right now." },
+          { "keyword": "ingredients", "response": "It has salicylic acid for ingrowns, niacinamide for irritation, and kojic acid for dark spots. Fragrance-free too!" },
+          { "keyword": "sensitive skin", "response": "Yes! It's fragrance-free and formulated specifically for sensitive bikini area skin. No burning, no irritation." },
+          { "keyword": "how long", "response": "I started noticing smoother skin in about two weeks, and the dark spots started fading around week three." },
+          { "keyword": "worth it", "response": "For under twenty dollars? Absolutely. I've spent way more on products that did way less for my bikini line." }
+        ]
+      }
+    },
+    "instagram": {
+      "caption": "Under twenty dollars fixed my bikini line nightmare — and I'm not being dramatic.\n\nI've dealt with ingrowns, dark spots, and irritation every single time I shave or wax. I tried exfoliating scrubs, random serums, even prescription creams. Nothing worked long enough to matter.\n\nThen I found the BBL Serum by @thebikinilineco and it genuinely changed my routine. It's a 3-in-1 formula with salicylic acid to clear ingrowns, kojic acid to fade dark spots, and niacinamide to calm irritation. It's fragrance-free and built for sensitive skin.\n\nThree weeks in: smoother skin, ingrowns almost gone, and the dark patches along my bikini line are visibly lighter. For $19.99 I would have been happy with just one of those results.\n\nIf you shave or wax your bikini area and you're tired of the aftermath, this is the product. Summer is coming — get ahead of it.\n\n#bikinilinecare #bblserum #thebikinilineco #tiktokmademebuyit #darkspotremoval #ingrownhairremoval #intimateskincare #skincareroutine #bodycare #summerskinprep",
+      "hashtagsCount": 10,
+      "brandMentions": ["@thebikinilineco"]
+    }
+  },
+
+  "steps": [
+    { "name": "product_intel", "status": "complete", "durationMs": 2100 },
+    { "name": "strategy", "status": "complete", "durationMs": 3400 },
+    { "name": "script", "status": "complete", "durationMs": 4200 },
+    { "name": "visuals", "status": "complete", "durationMs": 5800 },
+    { "name": "audio", "status": "complete", "durationMs": 3200 },
+    { "name": "metadata", "status": "complete", "durationMs": 2900 }
+  ]
+}
