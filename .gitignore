@@ -6,6 +6,12 @@ coverage/
 *.log
 .env*
 !.env.example
+# Local SQLite database (contains user secrets)
+database.db
+
+# Supabase backups (contain credentials)
+backups/
+
 # Wrangler local dev secrets (never commit)
 .dev.vars
 worker/.dev.vars
