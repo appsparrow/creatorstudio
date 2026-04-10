@@ -976,6 +976,54 @@ app.post('/api/ugc/generate', async (req, res) => {
 
     console.log('[UGC Pipeline] Starting for:', input.substring(0, 100));
 
+    // ---- Load Production Library from Supabase ----
+    const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
+    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+    let libraryHooks: any[] = [];
+    let libraryFormats: any[] = [];
+    let libraryRules: any[] = [];
+    let librarySettings: any[] = [];
+
+    if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+      try {
+        const libRes = await fetch(`${SUPABASE_URL}/rest/v1/production_library?is_active=eq.true&order=sort_order`, {
+          headers: {
+            'apikey': SUPABASE_SERVICE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+            'Accept': 'application/json',
+          },
+        });
+        if (libRes.ok) {
+          const allItems = await libRes.json() as any[];
+          libraryHooks = allItems.filter((i: any) => i.item_type === 'viral_hook');
+          libraryFormats = allItems.filter((i: any) => i.item_type === 'content_format');
+          libraryRules = allItems.filter((i: any) => i.item_type === 'decision_rule');
+          librarySettings = allItems.filter((i: any) => i.item_type === 'location_setting');
+          console.log(`[UGC Pipeline] Library loaded: ${libraryHooks.length} hooks, ${libraryFormats.length} formats, ${libraryRules.length} rules, ${librarySettings.length} settings`);
+        }
+      } catch (e) {
+        console.warn('[UGC Pipeline] Could not load library, using defaults');
+      }
+    }
+
+    // Build library context strings for Claude prompts
+    const hooksContext = libraryHooks.length > 0
+      ? libraryHooks.map((h: any) => `${h.label} (score: ${h.performance_score}): "${h.data.structure}" — Best for: ${(h.data.bestFor || []).join(', ')}. Psychology: ${h.data.psychology || ''}. Trigger: ${h.data.triggerCondition || ''}`).join('\n')
+      : 'price_reveal, pov, twist, social_proof, opinion, discovery, before_after, comparison';
+
+    const formatsContext = libraryFormats.length > 0
+      ? libraryFormats.map((f: any) => `${f.label} (${f.data.duration}): ${(f.data.bestFor || []).join(', ')}`).join('\n')
+      : 'product_demo (15-20s), try_on (20-30s), comparison (15-20s), storytime (20-30s), list (20-30s), transformation (20-30s)';
+
+    const rulesContext = libraryRules.length > 0
+      ? libraryRules.map((r: any) => `${r.data.category}: hook=${(r.data.recommendedHook || '').replace('hook_', '')} format=${(r.data.recommendedFormat || '').replace('format_', '')} setting=${(r.data.recommendedSetting || '').replace('setting_', '')} — ${r.data.reasoning || ''}`).join('\n')
+      : '';
+
+    const settingsContext = librarySettings.length > 0
+      ? librarySettings.map((s: any) => `${s.label}: Visual: ${s.data.visual || ''}. Outfit: ${s.data.outfit || ''}. Props: ${(s.data.props || []).join(', ')}. Lighting: ${s.data.lighting || ''}. Mood: ${s.data.mood || ''}`).join('\n')
+      : '';
+
     // STEP 1: Product Intel (Haiku — fast, structured)
     console.log('[UGC Pipeline] Step 1: Product Intel...');
     const productIntel = await callClaude(HAIKU,
@@ -988,31 +1036,85 @@ Return JSON with these fields:
 - productName, brand, category (one of: beauty_face_makeup, beauty_eye_makeup, beauty_lip, beauty_skincare, beauty_body, fashion_clothing, fashion_accessories, home_kitchen, home_decor, lifestyle_wellness, lifestyle_tech), subcategory, price (number), currency ("USD"), size, keyFeatures (array), primaryBenefit (string), painPointsSolved (array), reviewSentiment: { positive: [], negative: [] }, competitorProducts: [{ name, price }], targetAudience (string), trendingStatus (boolean), sourceUrl (string)`
     );
 
-    // STEP 2: Strategy (Sonnet — creative decisions)
+    // STEP 2: Strategy (Sonnet — uses Production Library knowledge)
     console.log('[UGC Pipeline] Step 2: Strategy...');
+
+    // Find matching decision rule for this product category
+    const matchingRule = libraryRules.find((r: any) => r.data.category === productIntel.category);
+    const matchingHook = matchingRule ? libraryHooks.find((h: any) => h.slug === matchingRule.data.recommendedHook) : null;
+
+    // Pick a random valid setting (not always the default — adds variety)
+    const validSettings: string[] = matchingRule?.data?.validSettings || [];
+    const excludedSettings: string[] = matchingRule?.data?.excludedSettings || [];
+    const randomSettingSlug = validSettings.length > 0
+      ? validSettings[Math.floor(Math.random() * validSettings.length)]
+      : matchingRule?.data?.recommendedSetting || '';
+    const matchingSetting = librarySettings.find((s: any) => s.slug === randomSettingSlug)
+      || librarySettings.find((s: any) => s.slug === matchingRule?.data?.recommendedSetting);
+
+    console.log(`[UGC Pipeline] Decision rule: ${matchingRule?.label || 'none'}, hook: ${matchingHook?.label || 'auto'}, setting: ${matchingSetting?.label || 'auto'} (from ${validSettings.length} valid, ${excludedSettings.length} excluded)`);
+
     const strategy = await callClaude(SONNET,
-      'You are a TikTok/Instagram content strategist.',
-      `Select the optimal content strategy for this product.
+      'You are a TikTok/Instagram content strategist. You have access to a Production Library of proven viral hook formats and content strategies.',
+      `Select the optimal content strategy for this product using the Production Library data below.
 
 PRODUCT: ${JSON.stringify(productIntel)}
 PERSONA: ${persona?.identity?.fullName || 'Content Creator'}, aesthetic: ${persona?.fashionStyle?.aesthetic || 'modern'}
 TARGET: ${productIntel.targetAudience || 'general audience'}
 
-Hook format decision tree:
-- IF price < $20 AND popular → price_reveal
-- ELIF trending → social_proof
-- ELIF has unique feature → discovery
-- ELIF solves problem → pov
-- ELIF many competitors → comparison
-- ELSE → opinion
+=== PRODUCTION LIBRARY: VIRAL HOOK FORMATS ===
+${hooksContext}
 
-Return JSON with: hookFormat, hookRationale, contentFormat, contentRationale, videoLength, setting, characterOutfit, optimalPostingTime, postingRationale, hashtagStrategy: { primary, conversion, product, brand, modifier }`
+=== PRODUCTION LIBRARY: CONTENT FORMATS ===
+${formatsContext}
+
+=== PRODUCTION LIBRARY: DECISION RULES (category → recommendation) ===
+${rulesContext}
+
+=== PRODUCTION LIBRARY: LOCATION/SETTING GUIDE ===
+${settingsContext}
+
+${matchingRule ? `
+LIBRARY RECOMMENDATION for "${productIntel.category}":
+- Recommended hook: ${(matchingRule.data.recommendedHook || '').replace('hook_', '')} (${matchingHook ? `score: ${matchingHook.performance_score}, structure: "${matchingHook.data.structure}"` : 'no details'})
+- Alternate hook: ${(matchingRule.data.alternateHook || '').replace('hook_', '')}
+- Recommended format: ${(matchingRule.data.recommendedFormat || '').replace('format_', '')}
+- SELECTED SETTING for this run: ${randomSettingSlug.replace('setting_', '')} (randomly selected from valid options for variety)
+- All valid settings: ${validSettings.map((s: string) => s.replace('setting_', '')).join(', ')}
+- Excluded settings (never use): ${excludedSettings.length > 0 ? excludedSettings.map((s: string) => s.replace('setting_', '')).join(', ') : 'none'}
+- Reasoning: ${matchingRule.data.reasoning || ''}
+` : 'No matching decision rule found for this category. Use your best judgment based on the hook formats and their trigger conditions.'}
+
+${matchingSetting ? `
+SETTING DETAILS for ${matchingSetting.label}:
+- Visual: ${matchingSetting.data.visual}
+- Outfit: ${matchingSetting.data.outfit}
+- Props: ${(matchingSetting.data.props || []).join(', ')}
+- Lighting: ${matchingSetting.data.lighting}
+- Mood: ${matchingSetting.data.mood}
+` : ''}
+
+INSTRUCTIONS:
+1. Use the library's decision rules as your primary guide
+2. You may override the recommendation if the product characteristics strongly suggest a different hook — explain why
+3. Include a "decisionLog" showing which library rule you used and why
+
+Return JSON with: hookFormat, hookRationale, contentFormat, contentRationale, videoLength, setting, characterOutfit, optimalPostingTime, postingRationale, hashtagStrategy: { primary, conversion, product, brand, modifier }, decisionLog: { ruleUsed: string, libraryHookScore: number, overridden: boolean, overrideReason: string | null }`
     );
 
-    // STEP 3: Script (Sonnet — creative writing)
+    // STEP 3: Script (Sonnet — uses library hook data)
     console.log('[UGC Pipeline] Step 3: Script...');
+
+    // Get the chosen hook's full data from library
+    const chosenHookSlug = `hook_${strategy.hookFormat}`;
+    const chosenHookData = libraryHooks.find((h: any) => h.slug === chosenHookSlug);
+    const hookExamples = chosenHookData?.data?.examples || [];
+    const hookStructure = chosenHookData?.data?.structure || '';
+    const hookPsychology = chosenHookData?.data?.psychology || '';
+    const hookTips = chosenHookData?.data?.tips || '';
+
     const script = await callClaude(SONNET,
-      'You are a UGC script writer for TikTok/Instagram.',
+      'You are a UGC script writer for TikTok/Instagram. You write scripts that feel authentic and conversational, like a real person talking to their phone.',
       `Write a ${strategy.videoLength || '20s'} video script.
 
 PRODUCT: ${productIntel.productName} — ${productIntel.primaryBenefit}
@@ -1020,6 +1122,13 @@ PRICE: $${productIntel.price}
 HOOK FORMAT: ${strategy.hookFormat}
 SETTING: ${strategy.setting}
 PERSONA VOICE: ${personaVoice}
+
+=== HOOK FORMAT FROM LIBRARY ===
+Structure: "${hookStructure}"
+Psychology: ${hookPsychology}
+Tips: ${hookTips}
+Examples that work well:
+${hookExamples.map((ex: string, i: number) => `  ${i + 1}. "${ex}"`).join('\n')}
 
 Instructions:
 1. Generate 10 hook variations for ${strategy.hookFormat} format
@@ -1041,15 +1150,22 @@ Return JSON with: hookVariants[{hook, score, rationale}], selectedHook, fullScri
     console.log('[UGC Pipeline] Steps 4-6: Visuals, Audio, Metadata (parallel)...');
 
     const [visuals, audio, metadata] = await Promise.all([
-      // STEP 4: Visuals (Sonnet — creative)
-      callClaude(SONNET,
+      // STEP 4: Visuals (Sonnet — uses library setting guide)
+      (() => {
+        const settingSlug = `setting_${strategy.setting}`;
+        const settingData = librarySettings.find((s: any) => s.slug === settingSlug) || matchingSetting;
+        const settingDetails = settingData
+          ? `\n=== SETTING GUIDE FROM LIBRARY: ${settingData.label} ===\nVisual: ${settingData.data.visual}\nOutfit: ${settingData.data.outfit}\nProps: ${(settingData.data.props || []).join(', ')}\nLighting: ${settingData.data.lighting}\nMood: ${settingData.data.mood}\n`
+          : '';
+        return callClaude(SONNET,
         'You are a visual director and storyboard artist for UGC video content.',
-        `Create a 5-shot storyboard for a UGC product video.
+        `Create a 6-shot storyboard for a UGC product video. Shot 0 is the THUMBNAIL, shots 1-5 are the video.
 
 CHARACTER: ${characterPrompt}
 PRODUCT: ${productIntel.productName} by ${productIntel.brand}
 OUTFIT: ${strategy.characterOutfit}
 SETTING: ${strategy.setting}
+${settingDetails}
 
 SCRIPT WITH VOICEOVER:
 - Shot 1 Hook (${script.fullScript?.hookSection?.timing}): ${script.fullScript?.hookSection?.voiceover}
@@ -1059,24 +1175,32 @@ SCRIPT WITH VOICEOVER:
 - Shot 5 CTA (${script.fullScript?.ctaSection?.timing}): ${script.fullScript?.ctaSection?.voiceover}
 
 INSTRUCTIONS:
+Generate 6 shots (Shot 0 = Thumbnail, Shots 1-5 = Video):
+
+SHOT 0 — THUMBNAIL:
+- Purpose: "thumbnail" — the click-bait image that makes people tap the video
+- Should be the most eye-catching, scroll-stopping frame
+- Include bold text overlay concept (e.g., "UNDER $20" or the hook text)
+- Product MUST be visible
+- Character expression should create curiosity
+
+SHOTS 1-5 — VIDEO:
 For each shot, create THREE prompts:
 
-1. IMAGE PROMPT (fullPrompt): A complete, self-contained image generation prompt. Bake composition, lighting, and props directly into the prompt text. Include the full character description. Format: vertical 9:16, iPhone 14 Pro quality, UGC aesthetic.
+1. IMAGE PROMPT (fullPrompt): Complete, self-contained. Bake composition, lighting, props INTO the prompt. Include full character description. Vertical 9:16, iPhone 14 Pro quality, UGC aesthetic.
 
-2. VIDEO PROMPT (videoPrompt): A prompt for video generation (Kling AI). Describe the motion, camera movement, and action. Start with the image description, then add: "The character [action]. Camera [movement]. Duration: [X]s"
+2. VIDEO PROMPT (videoPrompt): For Kling AI. Describe motion, camera movement, action. Format: image description + "The character [action]. Camera [movement]. Duration: [X]s"
 
-3. VOICEOVER (voiceover): The exact voiceover line for this shot, formatted as: She says "[emotion tag] voiceover text here" — include ElevenLabs expression tags like [curious], [calm], [playfully], [pause].
-
-Also include:
-- compositionNotes, lighting, props[] as metadata (but these should ALSO be embedded in the fullPrompt)
+3. VOICEOVER (voiceover): Exact voiceover line. Format: She says "[emotion tag] voiceover text" — with ElevenLabs tags [curious], [calm], [playfully], [pause].
 
 Return JSON with:
 - baseCharacterPrompt: the character lock text
 - fullAudioScript: "${script.elevenlabsFullScript || ''}"
-- shotPrompts: [{shotId, timing, purpose, fullPrompt, videoPrompt, voiceover, compositionNotes, lighting, props[]}]
-- consistencyChecklist: [7 items for visual consistency]
+- shotPrompts: [{shotId, timing, purpose, fullPrompt, videoPrompt, voiceover, compositionNotes, lighting, props[]}] (6 items, first is thumbnail)
+- consistencyChecklist: [7 items]
 - imageGenerationSettings: {platform:"freepik", resolution:"1080x1920", aspectRatio:"9:16", quality:"high", style:"photorealistic_ugc"}`
-      ),
+        );
+      })(),
 
       // STEP 5: Audio (Haiku — structured)
       callClaude(HAIKU,

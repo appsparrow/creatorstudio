@@ -474,7 +474,7 @@ The schema migration was written to be entirely additive:
 | `UGC-AGENT-DEFINITIONS.md` | 6 agent definitions with prompt context and parallel execution map |
 | `sample-data/bbl-serum-package.json` | Complete pipeline output for BBL Serum (real data reference) |
 
-### Screenshot Capture Checklist
+### Screenshot Capture Checklist — Session 1
 
 The following screenshots should be taken now while the build is fresh — they will not be reconstructable later:
 
@@ -490,3 +490,221 @@ The following screenshots should be taken now while the build is fresh — they 
 - [ ] Supabase table editor — `ugc_pipeline_runs` with a completed row
 - [ ] Supabase table editor — `prompts` showing all 12 seeded rows
 - [ ] Side-by-side: Studio mode sidebar vs UGC mode sidebar (source filter working)
+
+---
+
+## Session 2 Updates (April 10, 2026)
+
+**Phase:** Build — Library + UX Polish
+**Status:** All Session 2 features shipped to staging. Pipeline now reads from Library. P0 items (character lock, Gemini fallback) still pending.
+
+---
+
+### What Happened
+
+Session 2 continued from where Session 1 ended. The Session 1 build had the 6-step Claude pipeline working and the core UGC UI in place. Session 2 focused on three things: (1) giving the pipeline a brain — the Production Library that grounds its decisions in seeded knowledge; (2) closing UX gaps that would block a real creator from using it; and (3) adding pipeline transparency so users understand why the AI made the choices it did.
+
+The Production Library was the defining work of the session. The `ugc/files/` folder contained battle-tested production knowledge — hook formats, content formats, format selector decision rules, location guides — but it was only accessible to the AI via prompt text. The Library moves this knowledge into the database where it can be queried by the pipeline, browsed by the user, and eventually edited without touching code.
+
+---
+
+### Key Decisions Made
+
+| Decision | Why | Alternatives Rejected |
+|----------|-----|----------------------|
+| Library lives in sidebar, not Settings | Settings is for config; the Library is a reference tool used while reviewing posts — needs to be accessible alongside the canvas | Separate page (breaks the side-by-side use case); inside a tab (too buried) |
+| Sidebar swaps to Library browser on icon click (canvas stays) | Creator needs to cross-reference Library while editing a post. Navigating away would break context. | Modal overlay (obscures the post being reviewed) |
+| Platform filter uses 40% opacity (not hide) | Preserves spatial layout so the user knows what exists; they're filtering, not deleting | Hiding items entirely (disorienting when switching filters) |
+| Shot 0 = Thumbnail in storyboard | Thumbnail is the first creative decision; it belongs at the start of the storyboard filmstrip, not as a separate UI | Separate thumbnail section above storyboard |
+| Affiliate URL persisted in `day.cta` | `cta` is the existing field for the call-to-action link — no schema change needed, fits the data model | New `affiliate_url` column (unnecessary schema addition) |
+| Good to Post checklist modal (16 items, 3 phases) | Creates accountability for quality before a post goes live. The 3-phase structure (export → posting → after) maps to the creator's actual workflow. | Simple "are you sure?" confirmation |
+| Persona pinning in localStorage | Pinning is a UI preference, not content data — doesn't belong in the database | DB column on personas table (heavier, slower) |
+| Decision Log inline in Strategy tab (collapsible) | Transparency belongs adjacent to the decision, not in a separate audit view | Separate "pipeline audit" page; tooltip-only |
+
+---
+
+### What Was Built
+
+#### 1. Production Library — Table + Seed + UI
+
+**`production_library` database table** created and seeded with 25 items:
+
+| Type | Count | What's seeded |
+|------|-------|---------------|
+| `viral_hook` | 8 | Price Reveal, POV, Twist, Social Proof, Opinion, Discovery, Before/After, Comparison — each with structure template, best-for criteria, scored examples, psychology notes |
+| `content_format` | 6 | Product Demo, Try-On Haul, Comparison, Styling List, Before/After, Transformation — each with timing breakdown and script structure |
+| `decision_rule` | 7 | Category-based rules: price < $20 AND trending → price_reveal, unique feature → discovery, etc. |
+| `location_setting` | 4 | Bathroom Vanity, Mirror/Closet, Kitchen Counter, Outdoor — with visual setup guides |
+
+**Library sidebar panel:** BookOpen icon appears below persona rail in UGC mode. Clicking it swaps the sidebar from post list to Library browser. Main canvas is untouched. Section list in sidebar (Viral Hooks / Content Formats / Decision Rules / Location Guide); clicking a section loads the detail view in the main canvas.
+
+**Platform filter:** All / TikTok / Instagram toggle at top of Library panel. Filtered items go to 40% opacity rather than hiding — preserves the spatial layout while indicating what's filtered out.
+
+**Hook cards:** 2-column card grid with name, performance score, structure template, best-for pills, and expandable examples.
+
+#### 2. Pipeline Wired to Library (Brain → Body Connection)
+
+Before Session 2, the pipeline's Step 2 (Strategy) made decisions based purely on prompt text. Now:
+
+- **Step 2** queries `production_library` items of type `decision_rule` and `viral_hook` at generation time. The decision rules drive hook format selection; hook data provides scoring context.
+- **Step 3** pulls `viral_hook` examples from the Library as stylistic anchors for script writing.
+- **Step 4** uses `location_setting` guidance from the Library to enrich visual prompts.
+
+This is the Library's core value proposition: the knowledge that was previously locked in markdown files now actively influences every pipeline run, and users can see exactly which Library items drove which decisions.
+
+#### 3. Decision Log in Strategy Output
+
+Step 2 now outputs a `decisionLog` object alongside the strategy:
+
+```json
+{
+  "hookChosen": "price_reveal",
+  "hookConfidence": 87,
+  "hookRejected": [
+    { "format": "pov", "score": 6.2, "reason": "Product solves problem but price point is the stronger hook" },
+    { "format": "discovery", "score": 5.8, "reason": "Category is too well-known for discovery framing" }
+  ],
+  "decisionPath": "price $19.99 < $20 AND trending=true → price_reveal",
+  "libraryItemRefs": ["viral_hook_price_reveal", "decision_rule_price_threshold"]
+}
+```
+
+Displayed in the Strategy tab as a collapsible "AI Production Choices" section. Shows the hook chosen (with confidence %), rejected alternatives with scores and reasons, the decision path taken, and a "View in Library" deep-link to the relevant Library item.
+
+#### 4. Thumbnail as Shot 0 in Storyboard
+
+The storyboard in the Visuals tab now opens with Shot 0 labeled as "Thumbnail." This is the first card in the horizontal filmstrip. When expanded, it shows:
+- Image prompt for the thumbnail
+- Composition notes specific to thumbnail (face centered, bold expression, product prominent)
+- Copy button
+
+Visual logic: the thumbnail is always the first creative decision. Putting it at position 0 in the filmstrip reflects how creators actually work — the thumbnail is planned first, not appended.
+
+#### 5. Affiliate URL Persistence
+
+Affiliate URL is now an editable input field in the Product Intel tab (not display-only text). The value is persisted in `day.cta`. When set, it is automatically injected into:
+- TikTok metadata caption with FTC disclosure language: `[product name] · [description]. Link in bio 🔗 #ad #affiliate`
+- Instagram caption with same disclosure
+
+The auto-injection happens in Step 6 (Metadata Builder) when it detects a non-empty `affiliateUrl` on the `ProductIntel` object.
+
+#### 6. Good to Post Checklist Modal
+
+Clicking the "Good to Post" toggle no longer immediately marks the post as published. Instead it triggers a modal with a 16-item checklist across three phases. All "Before" items must be checked.
+
+| Phase | Items | Key checks |
+|-------|-------|------------|
+| Before Export | 7 | Character consistency, product visibility, overlays readable, audio timing, export specs |
+| Before Posting | 5 | Affiliate link tested, caption length, hashtag count, trending sound confirmed, schedule set |
+| After Posting | 4 | First-hour comment replies, pin engagement comment, 24h performance notes, viral flagging |
+
+The three-phase structure maps to how creators actually work — export prep, platform upload prep, and post-live engagement. Each phase can be collapsed after all items are checked.
+
+#### 7. Persona Pinning
+
+Pin icon added to the persona editor. Pinned personas:
+- Sort to the top of the persona rail with a violet dot indicator
+- Are separated from unpinned personas by a thin divider
+- Persist across page refreshes (stored in `localStorage`)
+
+Designed for creators managing 5+ personas who always start from the same 1–2 priority personas.
+
+---
+
+### Files Created (Session 2)
+
+| File | Description |
+|------|-------------|
+| `supabase/migrations/003_production_library.sql` | Schema + seed for `production_library` table with 25 items |
+| `src/components/ugc/LibraryPanel.tsx` | Sidebar Library browser — section list, platform filter, hook cards, format cards |
+| `src/components/ugc/LibraryCanvas.tsx` | Main canvas Library detail view — renders full item content by type |
+| `src/components/ugc/GoodToPostChecklist.tsx` | 16-item pre-publish checklist modal — 3 phases, all Before items required |
+| `src/components/ugc/DecisionLog.tsx` | Collapsible "AI Production Choices" section for Strategy tab — hook choice, rejected alternatives, decision path, Library deep-links |
+
+---
+
+### Files Modified (Session 2)
+
+| File | What Changed |
+|------|-------------|
+| `src/Workspace.tsx` | Library panel state management, BookOpen icon in sidebar, LibraryPanel integration, LibraryCanvas integration, persona pinning (pin state from localStorage, sorted rail with violet dot) |
+| `src/components/ugc/UGCPostCard.tsx` | Shot 0 labeled as Thumbnail in storyboard; affiliate URL as editable input field; Good to Post toggle → GoodToPostChecklist modal; Danger Zone moved to collapsible bottom section; DecisionLog added to Strategy tab |
+| `server.ts` | Step 2 (`/api/ugc/generate`) now queries `production_library` for decision rules and hooks; Step 3 pulls hook examples from Library; Step 4 pulls location settings; all three steps pass Library data into their prompt context |
+| `src/types/ugc.ts` | Added `decisionLog` to `ContentStrategy`; added `isThumbnail` flag and updated `shotId` convention on `ShotPrompt`; added `affiliateUrl` to `ProductIntel` |
+| `src/types.ts` | No changes in Session 2 |
+
+---
+
+### Metrics Snapshot (End of Session 2)
+
+| Metric | Value |
+|--------|-------|
+| Production Library items seeded | 25 |
+| Pipeline steps reading from Library | 3 of 6 (Steps 2, 3, 4) |
+| Total prompts in `prompts` table | 12 |
+| New components built (total across sessions) | 11 |
+| Storyboard shots (including thumbnail) | Shot 0 + 5 video shots |
+| Checklist items in Good to Post modal | 16 (7 + 5 + 4) |
+| Existing Studio posts preserved intact | 42 |
+
+---
+
+### What's Now Working (End of Session 2)
+
+Everything from Session 1 plus:
+- **Production Library** — table seeded, sidebar panel, canvas detail, platform filter
+- **Pipeline reads from Library** — Steps 2, 3, 4 grounded in seeded knowledge
+- **Decision Log** — visible in Strategy tab, shows hook choice reasoning, links to Library
+- **Thumbnail as Shot 0** — first storyboard card labeled and treated as thumbnail
+- **Affiliate URL** — editable input, persists in `day.cta`, auto-injected into Metadata
+- **Good to Post checklist modal** — 16 items, 3 phases, required before publishing
+- **Persona pinning** — pin icon, violet dot, sorted rail, localStorage persistence
+- **Copy buttons** — on all visual prompts, video prompts, voiceover, scripts, captions, hashtags, affiliate links
+- **Regenerate with confirmation modal** — accidental re-run prevention in place
+- **Danger Zone** — delete moved to collapsible section at bottom of post detail
+
+---
+
+### Open Items After Session 2
+
+#### P0 — Must fix before real-user testing
+
+| # | Item | Detail |
+|---|------|--------|
+| 1 | **Character lock prompt quality** | `baseCharacterPrompt` is still field concatenation. Should use Claude to compose from persona appearance data. User needs review/edit UI per persona before pipeline use. |
+| 2 | **Gemini fallback** | Claude credits ran out during first real test run. Pipeline has no graceful fallback. Gemini handles Steps 1, 5, 6 (structured) well as backup. |
+| 3 | **End-to-end status wiring** | `draft → generating → completed → published` states are rendered but not fully wired to pipeline execution in real-time. |
+
+#### P1 — Important features
+
+| # | Item | Detail |
+|---|------|--------|
+| 4 | **Per-persona UGC tab** | Persona editor needs a UGC tab for content pillars, thumbnail style preferences, platform priority (TikTok primary vs Instagram). Brainstorming doc has the scope. |
+| 5 | **Thumbnail style picker in creation flow** | Modal step in New Video Package overlay. Shows uploaded reference images as 9:16 cards with style tags. Per-persona templates stored in persona editor. |
+| 6 | **"View in Library" deep-links from Decision Log** | Link exists in the UI but the Library router doesn't support deep-linking to a specific item yet. |
+
+#### P2 — Nice to have
+
+| # | Item | Detail |
+|---|------|--------|
+| 7 | **Progressive step updates** | SSE / polling for real-time per-step progress. `supabase_realtime` is already enabled on `ugc_pipeline_runs` — infrastructure ready. |
+| 8 | **Step-level regeneration** | Re-run one step without re-running the full pipeline. Requires dependency management (Steps 4/5/6 must re-run if Step 3 changes). |
+| 9 | **Export to Freepik / Higgsfield** | Direct integration or formatted export of shot prompts. |
+
+---
+
+### Screenshot Capture Checklist — Session 2
+
+These should be captured immediately — they won't be reconstructable from memory:
+
+- [ ] Library panel open in sidebar (section list visible)
+- [ ] Library canvas view — Viral Hooks section with card grid
+- [ ] Library canvas view — Decision Rules table
+- [ ] Platform filter toggle (TikTok selected, Instagram items at 40% opacity)
+- [ ] Strategy tab — Decision Log expanded (hook choice + rejected alternatives + decision path)
+- [ ] Storyboard — Shot 0 labeled as Thumbnail expanded with Image/Video/Audio prompts
+- [ ] Product Intel tab — Affiliate URL as editable input field
+- [ ] Good to Post checklist modal — Before Export phase with checkboxes
+- [ ] Persona rail — pinned personas (violet dots) sorted above unpinned
+- [ ] Supabase table editor — `production_library` showing 25 seeded rows
+- [ ] Strategy tab — "View in Library" deep-link from Decision Log

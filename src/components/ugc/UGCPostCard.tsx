@@ -52,6 +52,7 @@ export default function UGCPostCard({ day, persona, onUpdateField, onDelete }: U
   const [isGenerating, setIsGenerating] = useState(day.status === 'generating');
   const [selectedHook, setSelectedHook] = useState(pipelineData?.script?.selectedHook ?? '');
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
+  const [showReadyChecklist, setShowReadyChecklist] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dangerZoneOpen, setDangerZoneOpen] = useState(false);
   const [affiliateUrl, setAffiliateUrl] = useState<string>(() => {
@@ -157,9 +158,15 @@ export default function UGCPostCard({ day, persona, onUpdateField, onDelete }: U
                 </button>
               ) : (
                 <>
-                  {/* Good to Post toggle */}
+                  {/* Good to Post toggle — opens checklist if not yet approved */}
                   <button
-                    onClick={() => onUpdateField('isGoodToPost', !day.isGoodToPost)}
+                    onClick={() => {
+                      if (day.isGoodToPost) {
+                        onUpdateField('isGoodToPost', false);
+                      } else {
+                        setShowReadyChecklist(true);
+                      }
+                    }}
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
                       day.isGoodToPost
@@ -258,14 +265,19 @@ export default function UGCPostCard({ day, persona, onUpdateField, onDelete }: U
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        {/* Before generation — pipeline description */}
+        {/* Before generation — waiting state */}
         {!run && !isGenerating && (
-          <div className="max-w-3xl mx-auto">
-            <div className="text-center mb-8">
-              <Sparkles className="w-10 h-10 text-violet-400/30 mx-auto mb-3" />
-              <p className="text-gray-400 text-sm">Paste a product URL above and hit Generate</p>
-              <p className="text-gray-600 text-xs mt-1">The pipeline will create a complete video content package</p>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <Loader2 className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+              <p className="text-gray-400 text-sm">Pipeline not started yet</p>
+              <p className="text-gray-600 text-xs mt-1">Use "Regenerate" above to run the pipeline for this product</p>
             </div>
+          </div>
+        )}
+        {/* REMOVED — old pipeline card grid. Generation now starts from the overlay popup */}
+        {false && (
+          <div className="max-w-3xl mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {TABS.map(tab => (
                 <div key={tab.name} className="border border-gray-800 rounded-lg p-3 bg-gray-950/40 space-y-1">
@@ -377,24 +389,134 @@ export default function UGCPostCard({ day, persona, onUpdateField, onDelete }: U
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowRegenConfirm(false)}>
           <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-white">Regenerate content?</h3>
-            <p className="text-sm text-gray-400">This will re-run the entire pipeline and replace all generated content (product intel, strategy, script, visuals, audio, metadata). This cannot be undone.</p>
+            <p className="text-sm text-gray-400">This will re-run the entire pipeline and replace all generated content. This cannot be undone.</p>
             <div className="flex items-center gap-3 pt-2">
-              <button
-                onClick={() => { setShowRegenConfirm(false); handleRegenerate(); }}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm font-semibold text-white transition-colors"
-              >
-                Regenerate
-              </button>
-              <button
-                onClick={() => setShowRegenConfirm(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-700 text-sm font-medium text-gray-300 hover:border-gray-500 transition-colors"
-              >
-                Cancel
-              </button>
+              <button onClick={() => { setShowRegenConfirm(false); handleRegenerate(); }} className="flex-1 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm font-semibold text-white transition-colors">Regenerate</button>
+              <button onClick={() => setShowRegenConfirm(false)} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-700 text-sm font-medium text-gray-300 hover:border-gray-500 transition-colors">Cancel</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Ready to Post checklist modal */}
+      {showReadyChecklist && (
+        <ReadyToPostChecklist
+          onConfirm={() => { setShowReadyChecklist(false); onUpdateField('isGoodToPost', true); }}
+          onCancel={() => setShowReadyChecklist(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Ready to Post Checklist
+// =============================================================================
+
+const CHECKLIST_SECTIONS = [
+  {
+    title: 'Before Export',
+    items: [
+      'All images use EXACT same base character prompt',
+      'Product clearly visible by second 8',
+      'Hook text overlay in first 2 seconds',
+      'Voiceover matches on-screen captions exactly',
+      'Trending sound layered at 30% volume',
+      'Video exported at 1080x1920 (9:16 vertical)',
+      'File size under 60MB',
+    ],
+  },
+  {
+    title: 'Before Posting',
+    items: [
+      'Affiliate link added to TikTok Shop tag OR bio',
+      'Caption under 150 characters with line breaks',
+      '3-5 hashtags only (no keyword stuffing)',
+      'Trending sound attached',
+      'Scheduled for optimal posting time',
+    ],
+  },
+  {
+    title: 'After Posting (within 2 hours)',
+    items: [
+      'Reply to first 5 comments',
+      'Monitor save/share rate in analytics',
+      'Note hook type + format performance',
+      'Flag for replication if viral (>10k views in 6hrs)',
+    ],
+  },
+];
+
+function ReadyToPostChecklist({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const totalItems = CHECKLIST_SECTIONS.reduce((sum, s) => sum + s.items.length, 0);
+  const prePostItems = CHECKLIST_SECTIONS.slice(0, 2).reduce((sum, s) => sum + s.items.length, 0);
+  const prePostChecked = CHECKLIST_SECTIONS.slice(0, 2).reduce(
+    (sum, s) => sum + s.items.filter(item => checked.has(item)).length, 0
+  );
+  const allPrePostChecked = prePostChecked === prePostItems;
+
+  const toggle = (item: string) => {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(item)) next.delete(item); else next.add(item);
+      return next;
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onCancel}>
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-800">
+          <h3 className="text-base font-semibold text-white">Ready to Post?</h3>
+          <p className="text-xs text-gray-500 mt-1">Review this checklist before marking as ready. Check all "Before" items to confirm.</p>
+        </div>
+
+        {/* Checklist */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+          {CHECKLIST_SECTIONS.map((section, si) => (
+            <div key={section.title}>
+              <p className="text-[11px] uppercase tracking-wider text-gray-500 font-medium mb-2">{section.title}</p>
+              <div className="space-y-1.5">
+                {section.items.map(item => {
+                  const isChecked = checked.has(item);
+                  return (
+                    <button
+                      key={item}
+                      onClick={() => toggle(item)}
+                      className="w-full flex items-start gap-3 text-left px-3 py-2 rounded-lg hover:bg-gray-800/50 transition-colors"
+                    >
+                      <div className={cn(
+                        'w-4 h-4 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center transition-all',
+                        isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-gray-600'
+                      )}>
+                        {isChecked && <Check className="w-2.5 h-2.5 text-white" />}
+                      </div>
+                      <span className={cn('text-sm', isChecked ? 'text-gray-400 line-through' : 'text-gray-200')}>{item}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-800 flex items-center gap-3">
+          <button
+            onClick={onConfirm}
+            disabled={!allPrePostChecked}
+            className="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold text-white transition-colors flex items-center justify-center gap-2"
+          >
+            <Check className="w-4 h-4" />
+            {allPrePostChecked ? 'Confirm — Good to Post' : `Check all items (${prePostChecked}/${prePostItems})`}
+          </button>
+          <button onClick={onCancel} className="px-4 py-2.5 rounded-xl border border-gray-700 text-sm font-medium text-gray-300 hover:border-gray-500 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

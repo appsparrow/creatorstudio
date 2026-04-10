@@ -7,7 +7,7 @@ import {
   MessageSquare, Palette, Scissors, BookOpen, UserCircle, Globe,
   Save, AlertCircle, Clock, Copy, ExternalLink, FolderOpen, Key,
   Zap, MousePointerClick, Camera, Shirt, Type, LayoutGrid, Users, Target, AtSign, UserPlus,
-  Lock, User, RefreshCw, GripVertical,
+  Lock, User, RefreshCw, GripVertical, Pin, PinOff,
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useAuth } from './contexts/AuthContext';
@@ -33,6 +33,7 @@ import type {
 } from './types';
 import UGCPostCard from './components/ugc/UGCPostCard';
 import PromptsManager from './components/ugc/PromptsManager';
+import ProductionLibrary, { ProductionLibrarySidebar, ProductionLibraryCanvas } from './components/ugc/ProductionLibrary';
 import ugcMockData from '../ugc/sample-data/bbl-serum-package.json';
 
 // ============================================================================
@@ -151,7 +152,13 @@ export default function Workspace() {
 
   // ---------- UGC New Package state ----------
   const [showNewUGCPrompt, setShowNewUGCPrompt] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [librarySection, setLibrarySection] = useState<string | null>(null);
+  const [pinnedPersonaIds, setPinnedPersonaIds] = useState<Set<string>>(
+    () => new Set(JSON.parse(localStorage.getItem('cs_pinned_personas') || '[]'))
+  );
   const [ugcProductUrl, setUgcProductUrl] = useState('');
+  const [ugcAffiliateUrl, setUgcAffiliateUrl] = useState('');
   const [ugcMode, setUgcMode] = useState<'auto' | 'hitl'>('hitl');
   const [isUGCGenerating, setIsUGCGenerating] = useState(false);
 
@@ -509,6 +516,19 @@ export default function Workspace() {
       setRightPanel('persona-editor');
     }
   }, [selectedPersona]);
+
+  const togglePinPersona = useCallback((id: string) => {
+    setPinnedPersonaIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      localStorage.setItem('cs_pinned_personas', JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
 
   const openSettings = useCallback(() => {
     setEditedSettings({ ...settings });
@@ -1558,25 +1578,57 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
 
         {/* Persona Avatars */}
         <div className="flex-1 overflow-y-auto space-y-2 w-full flex flex-col items-center py-1 scrollbar-hide">
-          {personas.map(p => (
-            <button
-              key={p.id}
-              onClick={() => selectPersona(p.id)}
-              title={p.identity.fullName}
-              className={cn(
-                'w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold transition-all flex-shrink-0',
-                'bg-gray-800 hover:bg-gray-700',
-                p.id === selectedPersonaId && 'ring-2 ring-white ring-offset-2 ring-offset-gray-900'
-              )}
-            >
-              {p.referenceImageUrl ? (
-                <img src={p.referenceImageUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
-              ) : (
-                <span className="text-gray-300">{getInitials(p.identity.fullName)}</span>
-              )}
-            </button>
-          ))}
+          {(() => {
+            const sortedPersonas = [...personas].sort((a, b) => {
+              const aPinned = pinnedPersonaIds.has(a.id);
+              const bPinned = pinnedPersonaIds.has(b.id);
+              if (aPinned && !bPinned) return -1;
+              if (!aPinned && bPinned) return 1;
+              return 0;
+            });
+            const pinnedCount = sortedPersonas.filter(p => pinnedPersonaIds.has(p.id)).length;
+
+            return sortedPersonas.map((p, idx) => (
+              <React.Fragment key={p.id}>
+                {pinnedCount > 0 && idx === pinnedCount && (
+                  <div className="w-8 border-t border-gray-700/60 my-0.5" />
+                )}
+                <button
+                  onClick={() => selectPersona(p.id)}
+                  title={p.identity.fullName}
+                  className={cn(
+                    'relative w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold transition-all flex-shrink-0',
+                    'bg-gray-800 hover:bg-gray-700',
+                    p.id === selectedPersonaId && 'ring-2 ring-white ring-offset-2 ring-offset-gray-900'
+                  )}
+                >
+                  {p.referenceImageUrl ? (
+                    <img src={p.referenceImageUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
+                  ) : (
+                    <span className="text-gray-300">{getInitials(p.identity.fullName)}</span>
+                  )}
+                  {pinnedPersonaIds.has(p.id) && (
+                    <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-violet-500 border-2 border-gray-900" />
+                  )}
+                </button>
+              </React.Fragment>
+            ));
+          })()}
         </div>
+
+        {/* Library — UGC mode only, above Settings */}
+        {workspaceMode === 'ugc' && (
+          <button
+            onClick={() => setShowLibrary(prev => !prev)}
+            title="Production Library"
+            className={cn(
+              'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
+              showLibrary ? 'bg-violet-500/20 text-violet-400 ring-1 ring-violet-500/30' : 'bg-gray-800 hover:bg-gray-700 text-gray-400'
+            )}
+          >
+            <BookOpen className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Settings */}
         <button
@@ -1595,6 +1647,16 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
       {/* COLUMN 2: Content Sidebar (hidden on mobile)                       */}
       {/* ================================================================== */}
       <div className={cn("hidden md:flex w-[280px] flex-shrink-0 bg-gray-900/60 border-r border-gray-800 flex-col transition-all duration-300", rightPanel !== 'none' && "blur-sm opacity-50 pointer-events-none")}>
+
+        {/* Production Library sidebar — replaces nav when open */}
+        {showLibrary ? (
+          <ProductionLibrarySidebar
+            onClose={() => { setShowLibrary(false); setLibrarySection(null); }}
+            activeSection={librarySection as any}
+            onSelectSection={(s) => setLibrarySection(s)}
+          />
+        ) : (
+        <>
         {/* Persona Header */}
         {selectedPersona ? (
           <div className="p-4 border-b border-gray-800">
@@ -1663,7 +1725,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
         ) : (
           <div className="p-3 space-y-2 border-b border-gray-800">
             <button
-              onClick={() => { setShowNewUGCPrompt(true); setUgcProductUrl(''); }}
+              onClick={() => { setShowNewUGCPrompt(true); setUgcProductUrl(''); setUgcAffiliateUrl(''); }}
               disabled={!selectedPersonaId}
               className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 rounded-lg text-sm font-medium text-white transition-colors"
             >
@@ -1784,6 +1846,8 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
           <div className="p-2 border-t border-gray-800 flex items-center justify-center gap-1.5 text-xs text-gray-400">
             <Loader2 className="w-3 h-3 animate-spin" /> Saving...
           </div>
+        )}
+        </>
         )}
       </div>
 
@@ -1953,6 +2017,22 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                   />
                 </div>
 
+                {/* Affiliate URL (optional) */}
+                <div>
+                  <label className="block text-xs text-gray-400 font-medium mb-2">
+                    Affiliate Link <span className="text-gray-600">(optional)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={ugcAffiliateUrl}
+                    onChange={e => setUgcAffiliateUrl(e.target.value)}
+                    className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 text-sm outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50"
+                    placeholder="https://amazon.com/dp/...?tag=your-affiliate-tag"
+                    disabled={isUGCGenerating}
+                  />
+                  <p className="text-[10px] text-gray-600 mt-1">Will be included in TikTok & Instagram captions with disclosure</p>
+                </div>
+
                 {/* Mode Toggle */}
                 <div>
                   <label className="block text-xs text-gray-400 font-medium mb-2">Pipeline Mode</label>
@@ -1981,7 +2061,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                       )}
                     >
                       <p className={cn('text-sm font-medium', ugcMode === 'hitl' ? 'text-violet-300' : 'text-gray-200')}>Human-in-the-Loop</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Review & edit each step</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Review & edit each step [Coming Soon]</p>
                     </button>
                   </div>
                 </div>
@@ -2032,6 +2112,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                       nd.platforms = ['TikTok', 'Instagram'];
                       nd.dayNumber = personaDays.length + 1;
                       nd.productUrl = ugcProductUrl;
+                      nd.cta = ugcAffiliateUrl || '';
                       nd.status = 'generating';
                       nd.theme = 'Generating...';
                       setDays(prev => [...prev, nd]);
@@ -2106,7 +2187,12 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
         </AnimatePresence>
 
         {/* Main content area */}
-        {viewMode === 'calendar' ? (
+        {showLibrary ? (
+          <ProductionLibraryCanvas
+            activeSection={librarySection as any}
+            onSelectSection={(s) => setLibrarySection(s)}
+          />
+        ) : viewMode === 'calendar' ? (
           <CalendarGrid
             days={personaDays}
             month={calendarMonth}
@@ -2196,6 +2282,8 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                 globalPostingEndTime={editedSettings.postingEndTime}
                 globalPostsPerDay={editedSettings.postsPerDay}
                 globalMetaAccessToken={editedSettings.metaAccessToken}
+                isPinned={pinnedPersonaIds.has(editedPersona.id)}
+                onTogglePin={() => togglePinPersona(editedPersona.id)}
               />
             </motion.div>
           )}
@@ -2219,7 +2307,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                   try {
                     await saveUserSettings(editedSettings);
                     setSettings(editedSettings);
-                  } catch {}
+                  } catch { }
                   setSaving(false);
                 }}
                 saving={saving}
@@ -3383,6 +3471,8 @@ function PersonaEditorPanel({
   globalPostingEndTime,
   globalPostsPerDay,
   globalMetaAccessToken,
+  isPinned,
+  onTogglePin,
 }: {
   persona: Persona;
   onUpdateField: (path: string, value: any) => void;
@@ -3401,6 +3491,8 @@ function PersonaEditorPanel({
   globalPostingEndTime?: string;
   globalPostsPerDay?: number;
   globalMetaAccessToken?: string;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
 }) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tab, setTab] = useState<'profile' | 'friends' | 'audience' | 'settings'>('profile');
@@ -3500,9 +3592,25 @@ function PersonaEditorPanel({
       {/* Top bar */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-xs uppercase tracking-widest text-gray-500 font-semibold">Persona Card</span>
-        <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors">
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          {onTogglePin && (
+            <button
+              onClick={onTogglePin}
+              title={isPinned ? 'Unpin persona' : 'Pin persona to top'}
+              className={cn(
+                'p-2 rounded-lg transition-colors',
+                isPinned
+                  ? 'bg-violet-500/20 text-violet-400 hover:bg-violet-500/30'
+                  : 'hover:bg-gray-800 text-gray-400 hover:text-white'
+              )}
+            >
+              {isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+            </button>
+          )}
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* AI Prompt Bar — only show when persona is empty/new */}
