@@ -166,6 +166,10 @@ export interface ContentDay {
   slides?: CarouselSlide[];
   hairstyle?: string;
   textPosition?: 'top' | 'middle' | 'bottom';
+  // Source: which workspace created this post
+  source?: 'studio' | 'ugc';
+  ugcRunId?: string;
+  productUrl?: string;
   // MVP1 additions
   storyArc?: StoryArc;
   targetAudienceSegment?: string;
@@ -190,6 +194,9 @@ export interface UserSettings {
   // Meta Graph API
   metaAccessToken?: string;
   metaAppId?: string;
+  // Claude / Anthropic
+  anthropicApiKey?: string;
+  primaryLlm?: 'claude' | 'gemini';
 }
 
 // --- Drive Asset ---

@@ -874,6 +874,278 @@ app.post('/api/settings', (req, res) => {
   }
 });
 
+// =============================================================================
+// Claude API Proxy — proxies requests to Anthropic's Messages API
+// =============================================================================
+
+app.post('/api/claude/messages', async (req, res) => {
+  try {
+    // Get API key from user settings or env
+    const settingsRow = db.prepare('SELECT data FROM user_settings WHERE id = 1').get() as any;
+    const settings = settingsRow ? JSON.parse(settingsRow.data) : {};
+    const apiKey = settings.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'Anthropic API key not configured. Add it in Settings.' });
+    }
+
+    const { model, system, messages, max_tokens, temperature } = req.body;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: model || 'claude-sonnet-4-20250514',
+        max_tokens: max_tokens || 4096,
+        temperature: temperature ?? 0.7,
+        ...(system ? { system } : {}),
+        messages,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Claude API error:', response.status, errorText);
+      return res.status(response.status).json({ error: errorText });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error: any) {
+    console.error('Claude proxy error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =============================================================================
+// UGC Pipeline — runs 6 agents sequentially using Claude
+// =============================================================================
+
+app.post('/api/ugc/generate', async (req, res) => {
+  try {
+    const { productUrl, productText, personaId, persona, mode } = req.body;
+
+    // Get API key
+    const settingsRow = db.prepare('SELECT data FROM user_settings WHERE id = 1').get() as any;
+    const settings = settingsRow ? JSON.parse(settingsRow.data) : {};
+    const apiKey = settings.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'Anthropic API key not configured.' });
+    }
+
+    const callClaude = async (model: string, system: string, prompt: string) => {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          temperature: 0.7,
+          system: system + '\n\nIMPORTANT: Respond with valid JSON only. No markdown code fences, no explanation, just the JSON object.',
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`Claude error ${response.status}: ${err}`);
+      }
+      const data = await response.json() as any;
+      const text = data.content[0]?.text || '{}';
+      const cleaned = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+      return JSON.parse(cleaned);
+    };
+
+    const SONNET = 'claude-sonnet-4-20250514';
+    const HAIKU = 'claude-haiku-4-5-20251001';
+
+    // Build character prompt from persona
+    const characterPrompt = persona ? `Photorealistic ${persona.identity?.nationality || ''} ${persona.identity?.gender || ''}, ${persona.identity?.age || 27} years old, ${persona.appearance?.hair || ''}, ${persona.appearance?.eyes || ''}, ${persona.appearance?.bodyType || ''} build, ${persona.appearance?.faceShape || ''} face, ${(persona.appearance?.distinctFeatures || []).join(', ')}, ${persona.fashionStyle?.aesthetic || ''} style, UGC content creator aesthetic, iPhone 14 Pro quality realism, high resolution, authentic lifestyle photography` : '';
+
+    const personaVoice = persona ? `Voice profile for ${persona.identity?.fullName || 'the persona'}: Core traits: ${(persona.psychographic?.coreTraits || []).join(', ')}. Style: ${persona.fashionStyle?.aesthetic || 'modern'}. Mission: ${persona.psychographic?.mission || ''}` : '';
+
+    const input = productText || productUrl || '';
+
+    console.log('[UGC Pipeline] Starting for:', input.substring(0, 100));
+
+    // STEP 1: Product Intel (Haiku — fast, structured)
+    console.log('[UGC Pipeline] Step 1: Product Intel...');
+    const productIntel = await callClaude(HAIKU,
+      'You are a product research analyst. Extract structured product intelligence.',
+      `Extract product data from this input and return as JSON:
+
+Product URL/Description: ${input}
+
+Return JSON with these fields:
+- productName, brand, category (one of: beauty_face_makeup, beauty_eye_makeup, beauty_lip, beauty_skincare, beauty_body, fashion_clothing, fashion_accessories, home_kitchen, home_decor, lifestyle_wellness, lifestyle_tech), subcategory, price (number), currency ("USD"), size, keyFeatures (array), primaryBenefit (string), painPointsSolved (array), reviewSentiment: { positive: [], negative: [] }, competitorProducts: [{ name, price }], targetAudience (string), trendingStatus (boolean), sourceUrl (string)`
+    );
+
+    // STEP 2: Strategy (Sonnet — creative decisions)
+    console.log('[UGC Pipeline] Step 2: Strategy...');
+    const strategy = await callClaude(SONNET,
+      'You are a TikTok/Instagram content strategist.',
+      `Select the optimal content strategy for this product.
+
+PRODUCT: ${JSON.stringify(productIntel)}
+PERSONA: ${persona?.identity?.fullName || 'Content Creator'}, aesthetic: ${persona?.fashionStyle?.aesthetic || 'modern'}
+TARGET: ${productIntel.targetAudience || 'general audience'}
+
+Hook format decision tree:
+- IF price < $20 AND popular → price_reveal
+- ELIF trending → social_proof
+- ELIF has unique feature → discovery
+- ELIF solves problem → pov
+- ELIF many competitors → comparison
+- ELSE → opinion
+
+Return JSON with: hookFormat, hookRationale, contentFormat, contentRationale, videoLength, setting, characterOutfit, optimalPostingTime, postingRationale, hashtagStrategy: { primary, conversion, product, brand, modifier }`
+    );
+
+    // STEP 3: Script (Sonnet — creative writing)
+    console.log('[UGC Pipeline] Step 3: Script...');
+    const script = await callClaude(SONNET,
+      'You are a UGC script writer for TikTok/Instagram.',
+      `Write a ${strategy.videoLength || '20s'} video script.
+
+PRODUCT: ${productIntel.productName} — ${productIntel.primaryBenefit}
+PRICE: $${productIntel.price}
+HOOK FORMAT: ${strategy.hookFormat}
+SETTING: ${strategy.setting}
+PERSONA VOICE: ${personaVoice}
+
+Instructions:
+1. Generate 10 hook variations for ${strategy.hookFormat} format
+2. Score each (specificity 3pts, emotion 3pts, brevity 2pts, scroll-stop 2pts, max 10)
+3. Select the top hook
+4. Write 4-section timed script:
+   - hookSection (0-2s): 6-10 words
+   - productSection (2-14s): 25-35 words
+   - trustSection (14-18s): 12-18 words
+   - ctaSection (18-20s): 7-12 words
+   Each with: timing, wordCount, textOverlay, voiceover (with [curious], [calm], [playfully] tags), visualCue
+5. Total 55-70 words
+6. Combine voiceover into elevenlabsFullScript
+
+Return JSON with: hookVariants[{hook, score, rationale}], selectedHook, fullScript{hookSection, productSection, trustSection, ctaSection}, totalWordCount, estimatedDuration, elevenlabsFullScript, elevenlabsSettings{voiceStability, voiceClarity, style, speed}`
+    );
+
+    // STEPS 4, 5, 6 can run in parallel after script
+    console.log('[UGC Pipeline] Steps 4-6: Visuals, Audio, Metadata (parallel)...');
+
+    const [visuals, audio, metadata] = await Promise.all([
+      // STEP 4: Visuals (Sonnet — creative)
+      callClaude(SONNET,
+        'You are a visual director and storyboard artist for UGC video content.',
+        `Create a 5-shot storyboard for a UGC product video.
+
+CHARACTER: ${characterPrompt}
+PRODUCT: ${productIntel.productName} by ${productIntel.brand}
+OUTFIT: ${strategy.characterOutfit}
+SETTING: ${strategy.setting}
+
+SCRIPT WITH VOICEOVER:
+- Shot 1 Hook (${script.fullScript?.hookSection?.timing}): ${script.fullScript?.hookSection?.voiceover}
+- Shot 2 Product (${script.fullScript?.productSection?.timing}): ${script.fullScript?.productSection?.voiceover}
+- Shot 3 Features (${script.fullScript?.trustSection?.timing || '8-12s'}): Close-up of product details
+- Shot 4 Trust (${script.fullScript?.trustSection?.timing}): ${script.fullScript?.trustSection?.voiceover}
+- Shot 5 CTA (${script.fullScript?.ctaSection?.timing}): ${script.fullScript?.ctaSection?.voiceover}
+
+INSTRUCTIONS:
+For each shot, create THREE prompts:
+
+1. IMAGE PROMPT (fullPrompt): A complete, self-contained image generation prompt. Bake composition, lighting, and props directly into the prompt text. Include the full character description. Format: vertical 9:16, iPhone 14 Pro quality, UGC aesthetic.
+
+2. VIDEO PROMPT (videoPrompt): A prompt for video generation (Kling AI). Describe the motion, camera movement, and action. Start with the image description, then add: "The character [action]. Camera [movement]. Duration: [X]s"
+
+3. VOICEOVER (voiceover): The exact voiceover line for this shot, formatted as: She says "[emotion tag] voiceover text here" — include ElevenLabs expression tags like [curious], [calm], [playfully], [pause].
+
+Also include:
+- compositionNotes, lighting, props[] as metadata (but these should ALSO be embedded in the fullPrompt)
+
+Return JSON with:
+- baseCharacterPrompt: the character lock text
+- fullAudioScript: "${script.elevenlabsFullScript || ''}"
+- shotPrompts: [{shotId, timing, purpose, fullPrompt, videoPrompt, voiceover, compositionNotes, lighting, props[]}]
+- consistencyChecklist: [7 items for visual consistency]
+- imageGenerationSettings: {platform:"freepik", resolution:"1080x1920", aspectRatio:"9:16", quality:"high", style:"photorealistic_ugc"}`
+      ),
+
+      // STEP 5: Audio (Haiku — structured)
+      callClaude(HAIKU,
+        'You are an audio producer for UGC TikTok/Instagram content.',
+        `Create audio production package.
+
+SCRIPT: ${script.elevenlabsFullScript || ''}
+PERSONA TRAITS: ${(persona?.psychographic?.coreTraits || []).join(', ')}
+PRODUCT CATEGORY: ${productIntel.category}
+
+Return JSON with:
+- elevenlabsPayload: { voiceId: "CONFIGURE_IN_ELEVENLABS", text (the script with expression tags), voiceSettings: { stability (0.3-0.5), similarityBoost (0.7-0.85), style (0.3-0.4), useSpeakerBoost: true }, outputFormat: "mp3_44100_192", speed: 1.05, recommendedStockVoice: { name, voiceId } }
+- trendingSoundOptions: 3 options [{ soundName, categoryFit, recommended (boolean), notes }]
+- audioMixingInstructions: { voiceoverVolume, backgroundSoundVolume, fadeInDuration, fadeOutDuration, voiceoverPriority: true }`
+      ),
+
+      // STEP 6: Metadata (Haiku — structured)
+      callClaude(HAIKU,
+        'You are a social media metadata specialist for TikTok and Instagram.',
+        `Generate metadata for BOTH platforms.
+
+PRODUCT: ${productIntel.productName} ($${productIntel.price})
+HOOK: ${script.selectedHook || ''}
+HASHTAG STRATEGY: ${JSON.stringify(strategy.hashtagStrategy || {})}
+POSTING TIME: ${strategy.optimalPostingTime || ''}
+PERSONA: ${persona?.identity?.fullName || ''}
+
+Return JSON with:
+- tiktok: { title (max 150 chars), titleCharCount, caption (3-4 lines, max 2 emojis), hashtags: [{tag, type, rationale}] (exactly 5), postingSchedule: { optimalTime, dayOfWeek, rationale, backupTimes[] }, engagementStrategy: { pinComment, autoReplyTriggers: [{keyword, response}] (5 triggers) } }
+- instagram: { caption (longer, 4-6 paragraphs, storytelling), hashtagsCount: 10, brandMentions: [] }`
+      ),
+    ]);
+
+    console.log('[UGC Pipeline] Complete!');
+
+    // Build step statuses
+    const steps = [
+      { name: 'product_intel', status: 'complete', durationMs: 0 },
+      { name: 'strategy', status: 'complete', durationMs: 0 },
+      { name: 'script', status: 'complete', durationMs: 0 },
+      { name: 'visuals', status: 'complete', durationMs: 0 },
+      { name: 'audio', status: 'complete', durationMs: 0 },
+      { name: 'metadata', status: 'complete', durationMs: 0 },
+    ];
+
+    const result = {
+      id: `run_${Date.now()}`,
+      personaId,
+      productUrl: productUrl || '',
+      mode: mode || 'auto',
+      status: 'complete',
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      steps,
+      productIntel,
+      strategy,
+      script,
+      visuals,
+      audio,
+      metadata,
+    };
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('[UGC Pipeline] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
 });

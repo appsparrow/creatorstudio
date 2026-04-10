@@ -31,6 +31,9 @@ import type {
   Persona, ContentDay, UserSettings, Platform, ContentType,
   ContentStatus, StoryArc, CaptionTone, CarouselSlide, TargetAudience, PersonaFriend,
 } from './types';
+import UGCPostCard from './components/ugc/UGCPostCard';
+import PromptsManager from './components/ugc/PromptsManager';
+import ugcMockData from '../ugc/sample-data/bbl-serum-package.json';
 
 // ============================================================================
 // Helpers
@@ -85,7 +88,7 @@ const emptyPersona = (): Persona => ({
   friends: [],
 });
 
-const emptyDay = (personaId: string): ContentDay => ({
+const emptyDay = (personaId: string, source: 'studio' | 'ugc' = 'studio'): ContentDay => ({
   id: generateId(),
   dayNumber: 0,
   date: new Date().toISOString().split('T')[0],
@@ -103,6 +106,7 @@ const emptyDay = (personaId: string): ContentDay => ({
   contentType: 'Photo',
   status: 'draft',
   personaId,
+  source,
   storyArc: 'Beautiful Day',
   captionTone: 'Aspirational',
 });
@@ -115,6 +119,10 @@ export default function Workspace() {
   const { signOut, user } = useAuth();
 
   // ---------- Core state ----------
+  const [workspaceMode, setWorkspaceMode] = useState<'studio' | 'ugc'>(() => {
+    return (localStorage.getItem('cs_workspace_mode') as 'studio' | 'ugc') || 'studio';
+  });
+  const [showModeSwitcher, setShowModeSwitcher] = useState(false);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [days, setDays] = useState<ContentDay[]>([]);
   const [settings, setSettings] = useState<UserSettings>({});
@@ -140,6 +148,12 @@ export default function Workspace() {
   const [newPostPromptText, setNewPostPromptText] = useState('');
   const [selectedAudienceSegment, setSelectedAudienceSegment] = useState('Aspiring Achiever');
   const [selectedContentFocus, setSelectedContentFocus] = useState<string[]>([]);
+
+  // ---------- UGC New Package state ----------
+  const [showNewUGCPrompt, setShowNewUGCPrompt] = useState(false);
+  const [ugcProductUrl, setUgcProductUrl] = useState('');
+  const [ugcMode, setUgcMode] = useState<'auto' | 'hitl'>('hitl');
+  const [isUGCGenerating, setIsUGCGenerating] = useState(false);
 
   // ---------- Modal state ----------
   const [showAIPromptModal, setShowAIPromptModal] = useState(false);
@@ -185,8 +199,14 @@ export default function Workspace() {
   // ---------- Derived ----------
   const selectedPersona = personas.find(p => p.id === selectedPersonaId) ?? null;
   const personaDays = useMemo(
-    () => days.filter(d => d.personaId === selectedPersonaId).sort((a, b) => a.date.localeCompare(b.date)),
-    [days, selectedPersonaId]
+    () => days
+      .filter(d => d.personaId === selectedPersonaId)
+      .filter(d => {
+        const daySource = d.source || 'studio';
+        return workspaceMode === 'studio' ? daySource === 'studio' : daySource === 'ugc';
+      })
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    [days, selectedPersonaId, workspaceMode]
   );
   const selectedDay = editedDay?.id === selectedDayId ? editedDay : days.find(d => d.id === selectedDayId) ?? null;
 
@@ -320,10 +340,24 @@ export default function Workspace() {
   // Actions
   // ============================================================================
 
+  const switchWorkspaceMode = useCallback((mode: 'studio' | 'ugc') => {
+    setWorkspaceMode(mode);
+    localStorage.setItem('cs_workspace_mode', mode);
+    setShowModeSwitcher(false);
+    // Reset to list view when switching modes
+    setViewMode('list');
+    // Reset selected day when switching modes (it may belong to the other source)
+    setSelectedDayId(null);
+    setEditedDay(null);
+  }, [viewMode]);
+
   const selectPersona = useCallback((id: string) => {
     setSelectedPersonaId(id);
     setRightPanel('none');
-    const firstDay = days.filter(d => d.personaId === id).sort((a, b) => a.date.localeCompare(b.date))[0];
+    const source = workspaceMode;
+    const firstDay = days
+      .filter(d => d.personaId === id && (d.source || 'studio') === source)
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
     if (firstDay) {
       setSelectedDayId(firstDay.id);
       setEditedDay(firstDay);
@@ -331,7 +365,7 @@ export default function Workspace() {
       setSelectedDayId(null);
       setEditedDay(null);
     }
-  }, [days]);
+  }, [days, workspaceMode]);
 
   const selectDay = useCallback((id: string) => {
     setSelectedDayId(id);
@@ -1292,6 +1326,86 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
 
   return (
     <div className="h-screen flex bg-gray-950 text-gray-100 overflow-hidden relative">
+
+      {/* ================================================================== */}
+      {/* WORKSPACE MODE SWITCHER (slide panel)                              */}
+      {/* ================================================================== */}
+      <AnimatePresence>
+        {showModeSwitcher && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="mode-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowModeSwitcher(false)}
+              className="fixed inset-0 z-50 bg-black/50"
+            />
+            {/* Panel */}
+            <motion.div
+              key="mode-panel"
+              initial={{ x: -280, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -280, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed left-0 top-0 bottom-0 z-50 w-[260px] bg-gray-900 border-r border-gray-800 flex flex-col shadow-2xl"
+            >
+              <div className="p-5 border-b border-gray-800">
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Workspace</h3>
+              </div>
+              <div className="flex-1 p-3 space-y-2">
+                <button
+                  onClick={() => switchWorkspaceMode('studio')}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-4 py-4 rounded-xl border transition-all text-left',
+                    workspaceMode === 'studio'
+                      ? 'border-rose-500/40 bg-rose-500/10 ring-1 ring-rose-500/20'
+                      : 'border-gray-800 bg-gray-900/60 hover:border-gray-600 hover:bg-gray-800/60'
+                  )}
+                >
+                  <div className={cn(
+                    'w-10 h-10 rounded-xl flex items-center justify-center',
+                    workspaceMode === 'studio' ? 'bg-rose-500/20' : 'bg-gray-800'
+                  )}>
+                    <Sparkles className={cn('w-5 h-5', workspaceMode === 'studio' ? 'text-rose-400' : 'text-gray-500')} />
+                  </div>
+                  <div>
+                    <p className={cn('text-sm font-semibold', workspaceMode === 'studio' ? 'text-white' : 'text-gray-300')}>Studio</p>
+                    <p className="text-[11px] text-gray-500">Content creation & calendar</p>
+                  </div>
+                  {workspaceMode === 'studio' && <Check className="w-4 h-4 text-rose-400 ml-auto" />}
+                </button>
+                <button
+                  onClick={() => switchWorkspaceMode('ugc')}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-4 py-4 rounded-xl border transition-all text-left',
+                    workspaceMode === 'ugc'
+                      ? 'border-violet-500/40 bg-violet-500/10 ring-1 ring-violet-500/20'
+                      : 'border-gray-800 bg-gray-900/60 hover:border-gray-600 hover:bg-gray-800/60'
+                  )}
+                >
+                  <div className={cn(
+                    'w-10 h-10 rounded-xl flex items-center justify-center',
+                    workspaceMode === 'ugc' ? 'bg-violet-500/20' : 'bg-gray-800'
+                  )}>
+                    <Zap className={cn('w-5 h-5', workspaceMode === 'ugc' ? 'text-violet-400' : 'text-gray-500')} />
+                  </div>
+                  <div>
+                    <p className={cn('text-sm font-semibold', workspaceMode === 'ugc' ? 'text-white' : 'text-gray-300')}>UGC</p>
+                    <p className="text-[11px] text-gray-500">Product-to-video pipeline</p>
+                  </div>
+                  {workspaceMode === 'ugc' && <Check className="w-4 h-4 text-violet-400 ml-auto" />}
+                </button>
+              </div>
+              <div className="p-4 border-t border-gray-800 text-center">
+                <p className="text-[10px] text-gray-600">Personas & settings are shared</p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* ================================================================== */}
       {/* MOBILE TOP BAR (visible only on small screens)                     */}
       {/* ================================================================== */}
@@ -1300,8 +1414,8 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
           <List className="w-5 h-5 text-gray-300" />
         </button>
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-rose-400" />
-          <span className="text-sm font-semibold">{selectedPersona?.identity.fullName || 'Creator Studio'}</span>
+          {workspaceMode === 'studio' ? <Sparkles className="w-4 h-4 text-rose-400" /> : <Zap className="w-4 h-4 text-violet-400" />}
+          <span className="text-sm font-semibold">{selectedPersona?.identity.fullName || (workspaceMode === 'studio' ? 'Creator Studio' : 'UGC Factory')}</span>
         </div>
         <button onClick={openSettings} className="p-2 rounded-lg hover:bg-gray-800">
           <Settings className="w-5 h-5 text-gray-300" />
@@ -1419,10 +1533,19 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
       {/* COLUMN 1: Persona Rail (hidden on mobile)                          */}
       {/* ================================================================== */}
       <div className={cn("hidden md:flex w-[72px] flex-shrink-0 bg-gray-900 border-r border-gray-800 flex-col items-center py-3 gap-2 transition-all duration-300", rightPanel !== 'none' && "blur-sm opacity-50 pointer-events-none")}>
-        {/* Logo */}
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-2">
+        {/* Logo — click to switch workspace */}
+        <button
+          onClick={() => setShowModeSwitcher(prev => !prev)}
+          title="Switch workspace"
+          className="w-10 h-10 rounded-xl flex items-center justify-center mb-2 hover:ring-2 hover:ring-violet-500/50 transition-all relative"
+        >
           <img src="/logo.png" alt="Creator Studio" className="w-9 h-9" />
-        </div>
+          {/* Mode indicator dot */}
+          <span className={cn(
+            'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-900',
+            workspaceMode === 'studio' ? 'bg-rose-500' : 'bg-violet-500'
+          )} />
+        </button>
 
         {/* Add Persona */}
         <button
@@ -1497,45 +1620,79 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="p-3 space-y-2 border-b border-gray-800">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowNewPostPrompt(true)}
-              disabled={!selectedPersonaId}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors"
-            >
-              <Plus className="w-4 h-4" /> New Post
-            </button>
+        {/* Action Buttons — changes based on workspace mode */}
+        {workspaceMode === 'studio' ? (
+          <div className="p-3 space-y-2 border-b border-gray-800">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowNewPostPrompt(true)}
+                disabled={!selectedPersonaId}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors"
+              >
+                <Plus className="w-4 h-4" /> New Post
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowImportModal(true)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium text-gray-300 transition-colors">
+                <Upload className="w-4 h-4" /> Import
+              </button>
+              <div className="flex bg-gray-800 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    'px-3 py-2 text-sm transition-colors',
+                    viewMode === 'list' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white'
+                  )}
+                  title="List view"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('calendar')}
+                  className={cn(
+                    'px-3 py-2 text-sm transition-colors',
+                    viewMode === 'calendar' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white'
+                  )}
+                  title="Calendar view"
+                >
+                  <Calendar className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowImportModal(true)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium text-gray-300 transition-colors">
-              <Upload className="w-4 h-4" /> Import
+        ) : (
+          <div className="p-3 space-y-2 border-b border-gray-800">
+            <button
+              onClick={() => { setShowNewUGCPrompt(true); setUgcProductUrl(''); }}
+              disabled={!selectedPersonaId}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 rounded-lg text-sm font-medium text-white transition-colors"
+            >
+              <Plus className="w-4 h-4" /> New Video Package
             </button>
             <div className="flex bg-gray-800 rounded-lg overflow-hidden">
               <button
                 onClick={() => setViewMode('list')}
                 className={cn(
-                  'px-3 py-2 text-sm transition-colors',
-                  viewMode === 'list' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white'
+                  'flex-1 px-3 py-2 text-sm transition-colors flex items-center justify-center gap-1.5',
+                  viewMode === 'list' ? 'bg-violet-500 text-white' : 'text-gray-400 hover:text-white'
                 )}
                 title="List view"
               >
-                <List className="w-4 h-4" />
+                <List className="w-4 h-4" /> List
               </button>
               <button
                 onClick={() => setViewMode('calendar')}
                 className={cn(
-                  'px-3 py-2 text-sm transition-colors',
+                  'flex-1 px-3 py-2 text-sm transition-colors flex items-center justify-center gap-1.5',
                   viewMode === 'calendar' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white'
                 )}
                 title="Calendar view"
               >
-                <Calendar className="w-4 h-4" />
+                <Calendar className="w-4 h-4" /> Calendar
               </button>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Day List */}
         <div className="flex-1 overflow-y-auto">
@@ -1599,6 +1756,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                         {day.status}
                       </span>
                       {isPublished && <Lock className="w-3 h-3 text-rose-400" />}
+                      {day.isGoodToPost && !isPublished && <Check className="w-3 h-3 text-emerald-400" />}
                       {/* Content type icon */}
                       {day.contentType === 'Photo' && <Image className="w-3 h-3 text-gray-500" />}
                       {day.contentType === 'Video' && <Video className="w-3 h-3 text-gray-500" />}
@@ -1762,6 +1920,191 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
           )}
         </AnimatePresence>
 
+        {/* New UGC Package Prompt Panel (mirrors New Post Prompt) */}
+        <AnimatePresence>
+          {showNewUGCPrompt && selectedPersona && (
+            <motion.div
+              key="new-ugc-prompt"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute inset-0 z-10 overflow-y-auto bg-gradient-to-b from-gray-900/80 to-gray-950/60 backdrop-blur-sm px-4 md:px-6 py-5"
+            >
+              <div className="max-w-3xl mx-auto space-y-5 py-4">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-violet-400" /> New Video Package
+                  </h3>
+                  <button onClick={() => setShowNewUGCPrompt(false)} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Product URL / Description */}
+                <div>
+                  <label className="block text-xs text-gray-400 font-medium mb-2">Product URL or Description</label>
+                  <textarea
+                    value={ugcProductUrl}
+                    onChange={e => setUgcProductUrl(e.target.value)}
+                    className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 text-sm min-h-[80px] resize-y outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/50"
+                    placeholder="Paste an Amazon or TikTok Shop URL, or describe the product with details (name, price, features, reviews)..."
+                    disabled={isUGCGenerating}
+                  />
+                </div>
+
+                {/* Mode Toggle */}
+                <div>
+                  <label className="block text-xs text-gray-400 font-medium mb-2">Pipeline Mode</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setUgcMode('auto')}
+                      disabled={isUGCGenerating}
+                      className={cn(
+                        'flex-1 px-4 py-3 rounded-xl border text-left transition-all',
+                        ugcMode === 'auto'
+                          ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500/30'
+                          : 'border-gray-700 bg-gray-800/40 hover:border-gray-500'
+                      )}
+                    >
+                      <p className={cn('text-sm font-medium', ugcMode === 'auto' ? 'text-violet-300' : 'text-gray-200')}>Auto</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Run all 6 steps automatically</p>
+                    </button>
+                    <button
+                      onClick={() => setUgcMode('hitl')}
+                      disabled={isUGCGenerating}
+                      className={cn(
+                        'flex-1 px-4 py-3 rounded-xl border text-left transition-all',
+                        ugcMode === 'hitl'
+                          ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500/30'
+                          : 'border-gray-700 bg-gray-800/40 hover:border-gray-500'
+                      )}
+                    >
+                      <p className={cn('text-sm font-medium', ugcMode === 'hitl' ? 'text-violet-300' : 'text-gray-200')}>Human-in-the-Loop</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Review & edit each step</p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Pipeline steps preview */}
+                <div>
+                  <label className="block text-xs text-gray-400 font-medium mb-2">Pipeline Steps</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { icon: '1', label: 'Product Intel', desc: 'Features, pricing, reviews' },
+                      { icon: '2', label: 'Strategy', desc: 'Hook format, setting, timing' },
+                      { icon: '3', label: 'Script', desc: '10 hooks + timed script' },
+                      { icon: '4', label: 'Visual Prompts', desc: '5 shots with character lock' },
+                      { icon: '5', label: 'Audio', desc: 'ElevenLabs + trending sounds' },
+                      { icon: '6', label: 'Metadata', desc: 'Captions, hashtags, schedule' },
+                    ].map(step => (
+                      <div key={step.icon} className="flex items-start gap-2 px-3 py-2 rounded-lg border border-gray-800 bg-gray-800/30">
+                        <span className="w-5 h-5 rounded-full bg-violet-500/15 text-violet-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">{step.icon}</span>
+                        <div>
+                          <p className="text-xs font-medium text-gray-300">{step.label}</p>
+                          <p className="text-[10px] text-gray-600">{step.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Persona info */}
+                <div className="flex items-center gap-3 bg-gray-800/40 rounded-xl px-4 py-3 border border-gray-700">
+                  {selectedPersona.referenceImageUrl && (
+                    <img src={selectedPersona.referenceImageUrl} alt="" className="w-10 h-10 rounded-full object-cover border border-gray-600" />
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">{selectedPersona.identity.fullName}</p>
+                    <p className="text-xs text-gray-500">Character lock will be built from this persona's appearance</p>
+                  </div>
+                </div>
+
+                {/* Generate button */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={async () => {
+                      if (!selectedPersonaId || !ugcProductUrl.trim()) return;
+                      setIsUGCGenerating(true);
+                      // Create the UGC post in sidebar immediately
+                      const nd = emptyDay(selectedPersonaId, 'ugc');
+                      nd.contentType = 'Video';
+                      nd.platforms = ['TikTok', 'Instagram'];
+                      nd.dayNumber = personaDays.length + 1;
+                      nd.productUrl = ugcProductUrl;
+                      nd.status = 'generating';
+                      nd.theme = 'Generating...';
+                      setDays(prev => [...prev, nd]);
+                      setSelectedDayId(nd.id);
+                      setEditedDay(nd);
+                      saveDay(nd).catch(console.error);
+                      setShowNewUGCPrompt(false);
+
+                      try {
+                        // Call real pipeline — Claude generates all 6 steps
+                        const response = await fetch('/api/ugc/generate', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            productUrl: ugcProductUrl,
+                            productText: ugcProductUrl,
+                            personaId: selectedPersonaId,
+                            persona: selectedPersona,
+                            mode: ugcMode,
+                          }),
+                        });
+
+                        if (!response.ok) {
+                          const err = await response.json();
+                          throw new Error(err.error || 'Pipeline failed');
+                        }
+
+                        const result = await response.json();
+
+                        // Update the post with real pipeline data
+                        nd.theme = result.productIntel?.productName || 'UGC Package';
+                        nd.hook = result.script?.selectedHook || '';
+                        nd.caption = result.metadata?.tiktok?.caption || '';
+                        nd.hashtags = result.metadata?.tiktok?.hashtags?.map((h: any) => h.tag).join(' ') || '';
+                        nd.cta = result.script?.fullScript?.ctaSection?.voiceover || '';
+                        nd.sceneDescription = result.visuals?.shotPrompts?.map((s: any) => s.fullPrompt).join('\n\n') || '';
+                        nd.onScreenText = [
+                          result.script?.fullScript?.hookSection?.textOverlay,
+                          result.script?.fullScript?.productSection?.textOverlay,
+                          result.script?.fullScript?.trustSection?.textOverlay,
+                          result.script?.fullScript?.ctaSection?.textOverlay,
+                        ].filter(Boolean).join(' | ');
+                        nd.musicSuggestion = result.audio?.trendingSoundOptions?.find((s: any) => s.recommended)?.soundName || '';
+                        nd.location = result.strategy?.setting || '';
+                        nd.notes = JSON.stringify(result);
+                        nd.status = 'completed';
+                        nd.ugcRunId = result.id;
+
+                        setEditedDay({ ...nd });
+                        setDays(prev => prev.map(d => d.id === nd.id ? { ...nd } : d));
+                        saveDay(nd).catch(console.error);
+                      } catch (err: any) {
+                        console.error('UGC Pipeline error:', err);
+                        nd.theme = 'Error: ' + (err.message || 'Pipeline failed');
+                        nd.status = 'draft';
+                        setEditedDay({ ...nd });
+                        setDays(prev => prev.map(d => d.id === nd.id ? { ...nd } : d));
+                        setError(err.message || 'UGC pipeline failed');
+                      } finally {
+                        setIsUGCGenerating(false);
+                      }
+                    }}
+                    disabled={!ugcProductUrl.trim() || isUGCGenerating}
+                    className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-sm font-semibold text-white transition-colors flex items-center gap-2"
+                  >
+                    {isUGCGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate Video Package</>}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Main content area */}
         {viewMode === 'calendar' ? (
           <CalendarGrid
@@ -1774,33 +2117,42 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
             onDuplicateDay={handleDuplicateDay}
           />
         ) : selectedDay ? (
-          <PostCard
-            day={selectedDay}
-            persona={selectedPersona}
-            onUpdateField={updateDayField}
-            onDelete={() => handleDeleteDay(selectedDay.id)}
-            onDuplicate={() => handleDuplicateDay(selectedDay.id)}
-            onGenerateImage={handleGenerateImage}
-            onConfirmGenerate={() => {
-              setConfirmModal({
-                title: 'Generate Image',
-                message: 'This will use AI credits to generate a new image. Existing image will be replaced.',
-                confirmLabel: 'Generate',
-                confirmVariant: 'default',
-                onConfirm: () => { handleGenerateImage(); setConfirmModal(null); },
-              });
-            }}
-            onGenerateVideo={handleGenerateVideo}
-            onGenerateThumbnail={handleGenerateThumbnail}
-            onPublish={handlePublish}
-            publishLabel={useMetaApi ? 'Publish to Instagram' : 'Publish via Blotato'}
-            isGenerating={isGenerating}
-            generatingStatus={generatingStatus}
-            videoStatus={videoStatus[selectedDay.id]}
-            onOpenLightbox={setLightboxUrl}
-            onOpenDrivePicker={handleOpenDrivePicker}
-            driveFiles={driveFiles}
-          />
+          workspaceMode === 'ugc' ? (
+            <UGCPostCard
+              day={selectedDay}
+              persona={selectedPersona}
+              onUpdateField={updateDayField}
+              onDelete={() => handleDeleteDay(selectedDay.id)}
+            />
+          ) : (
+            <PostCard
+              day={selectedDay}
+              persona={selectedPersona}
+              onUpdateField={updateDayField}
+              onDelete={() => handleDeleteDay(selectedDay.id)}
+              onDuplicate={() => handleDuplicateDay(selectedDay.id)}
+              onGenerateImage={handleGenerateImage}
+              onConfirmGenerate={() => {
+                setConfirmModal({
+                  title: 'Generate Image',
+                  message: 'This will use AI credits to generate a new image. Existing image will be replaced.',
+                  confirmLabel: 'Generate',
+                  confirmVariant: 'default',
+                  onConfirm: () => { handleGenerateImage(); setConfirmModal(null); },
+                });
+              }}
+              onGenerateVideo={handleGenerateVideo}
+              onGenerateThumbnail={handleGenerateThumbnail}
+              onPublish={handlePublish}
+              publishLabel={useMetaApi ? 'Publish to Instagram' : 'Publish via Blotato'}
+              isGenerating={isGenerating}
+              generatingStatus={generatingStatus}
+              videoStatus={videoStatus[selectedDay.id]}
+              onOpenLightbox={setLightboxUrl}
+              onOpenDrivePicker={handleOpenDrivePicker}
+              driveFiles={driveFiles}
+            />
+          )
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-500">
             <div className="text-center">
@@ -4182,6 +4534,30 @@ function SettingsPanel({
         </Field>
       </Section>
 
+      {/* AI Provider */}
+      <Section title="AI Provider">
+        <Field label="Primary LLM">
+          <select
+            value={settings.primaryLlm ?? 'claude'}
+            onChange={e => onUpdateField('primaryLlm', e.target.value)}
+            className="input-field"
+          >
+            <option value="claude">Claude (Anthropic)</option>
+            <option value="gemini">Gemini (Google)</option>
+          </select>
+        </Field>
+        <Field label="Anthropic API Key" className="mt-3">
+          <input
+            type="password"
+            value={settings.anthropicApiKey ?? ''}
+            onChange={e => onUpdateField('anthropicApiKey', e.target.value)}
+            className="input-field"
+            placeholder="sk-ant-..."
+          />
+        </Field>
+        <p className="text-[10px] text-gray-500 mt-2 px-1">Claude Sonnet for creative tasks, Haiku for structured tasks. Get your key from console.anthropic.com</p>
+      </Section>
+
       {/* Meta / Instagram API */}
       <Section title="Meta / Instagram API">
         <Field label="Meta Access Token">
@@ -4220,6 +4596,9 @@ function SettingsPanel({
           />
         </Field>
       </Section>
+
+      {/* AI Prompts */}
+      <PromptsManager />
 
       {/* Profile & Account */}
       <div className="pt-6 mt-6 border-t border-gray-800 space-y-4">

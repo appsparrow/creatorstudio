@@ -7,6 +7,7 @@ const tabs = [
   { to: 'calendar', label: 'Content Calendar' },
   { to: 'audience', label: 'Target Audience' },
   { to: 'products', label: 'Products' },
+  { to: 'ugc', label: 'UGC' },
   { to: 'storyline', label: 'Storyline' },
 ];
 
