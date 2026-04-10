@@ -7,7 +7,7 @@ import {
   MessageSquare, Palette, Scissors, BookOpen, UserCircle, Globe,
   Save, AlertCircle, Clock, Copy, ExternalLink, FolderOpen, Key,
   Zap, MousePointerClick, Camera, Shirt, Type, LayoutGrid, Users, Target, AtSign, UserPlus,
-  Lock, User, RefreshCw, GripVertical, Pin, PinOff,
+  Lock, User, RefreshCw, GripVertical, Pin, PinOff, Moon, Sun,
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useAuth } from './contexts/AuthContext';
@@ -44,7 +44,7 @@ const STATUS_COLORS: Record<ContentStatus, string> = {
   draft: 'bg-gray-600 text-gray-200',
   generating: 'bg-amber-500/80 text-amber-100 animate-pulse',
   completed: 'bg-blue-500/80 text-blue-100',
-  published: 'bg-rose-500/80 text-rose-100',
+  published: 'bg-brand-500/80 text-rose-100',
 };
 
 const PLATFORM_LETTERS: Record<Platform, string> = {
@@ -118,6 +118,20 @@ const emptyDay = (personaId: string, source: 'studio' | 'ugc' = 'studio'): Conte
 
 export default function Workspace() {
   const { signOut, user } = useAuth();
+
+  // ---------- Apply saved theme + mode on mount ----------
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('cs_theme') || 'default';
+    const savedMode = localStorage.getItem('cs_mode') || 'dark';
+    if (savedTheme !== 'default') {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+    if (savedMode === 'light') {
+      document.documentElement.setAttribute('data-mode', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-mode');
+    }
+  }, []);
 
   // ---------- Core state ----------
   const [workspaceMode, setWorkspaceMode] = useState<'studio' | 'ugc'>(() => {
@@ -1334,8 +1348,8 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
 
   if (loading) {
     return (
-      <div className="h-screen bg-gray-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-gray-300 animate-spin" />
+      <div className="h-screen bg-surface-0 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-text-secondary animate-spin" />
       </div>
     );
   }
@@ -1345,7 +1359,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
   // ============================================================================
 
   return (
-    <div className="h-screen flex bg-gray-950 text-gray-100 overflow-hidden relative">
+    <div className="h-screen flex bg-surface-0 text-text-primary overflow-hidden relative">
 
       {/* ================================================================== */}
       {/* WORKSPACE MODE SWITCHER (slide panel)                              */}
@@ -1369,10 +1383,10 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -280, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed left-0 top-0 bottom-0 z-50 w-[260px] bg-gray-900 border-r border-gray-800 flex flex-col shadow-2xl"
+              className="fixed left-0 top-0 bottom-0 z-50 w-[260px] bg-surface-50 border-r border-border flex flex-col shadow-2xl"
             >
-              <div className="p-5 border-b border-gray-800">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Workspace</h3>
+              <div className="p-5 border-b border-border">
+                <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wider">Workspace</h3>
               </div>
               <div className="flex-1 p-3 space-y-2">
                 <button
@@ -1380,46 +1394,46 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                   className={cn(
                     'w-full flex items-center gap-3 px-4 py-4 rounded-xl border transition-all text-left',
                     workspaceMode === 'studio'
-                      ? 'border-rose-500/40 bg-rose-500/10 ring-1 ring-rose-500/20'
-                      : 'border-gray-800 bg-gray-900/60 hover:border-gray-600 hover:bg-gray-800/60'
+                      ? 'border-brand-500/40 bg-brand-500/10 ring-1 ring-brand-500/20'
+                      : 'border-border bg-surface-50/60 hover:border-border-light hover:bg-surface-200/60'
                   )}
                 >
                   <div className={cn(
                     'w-10 h-10 rounded-xl flex items-center justify-center',
-                    workspaceMode === 'studio' ? 'bg-rose-500/20' : 'bg-gray-800'
+                    workspaceMode === 'studio' ? 'bg-brand-500/20' : 'bg-surface-200'
                   )}>
-                    <Sparkles className={cn('w-5 h-5', workspaceMode === 'studio' ? 'text-rose-400' : 'text-gray-500')} />
+                    <Sparkles className={cn('w-5 h-5', workspaceMode === 'studio' ? 'text-brand-400' : 'text-text-muted')} />
                   </div>
                   <div>
-                    <p className={cn('text-sm font-semibold', workspaceMode === 'studio' ? 'text-white' : 'text-gray-300')}>Studio</p>
-                    <p className="text-[11px] text-gray-500">Content creation & calendar</p>
+                    <p className={cn('text-sm font-semibold', workspaceMode === 'studio' ? 'text-text-primary' : 'text-text-secondary')}>Studio</p>
+                    <p className="text-[11px] text-text-muted">Content creation & calendar</p>
                   </div>
-                  {workspaceMode === 'studio' && <Check className="w-4 h-4 text-rose-400 ml-auto" />}
+                  {workspaceMode === 'studio' && <Check className="w-4 h-4 text-brand-400 ml-auto" />}
                 </button>
                 <button
                   onClick={() => switchWorkspaceMode('ugc')}
                   className={cn(
                     'w-full flex items-center gap-3 px-4 py-4 rounded-xl border transition-all text-left',
                     workspaceMode === 'ugc'
-                      ? 'border-violet-500/40 bg-violet-500/10 ring-1 ring-violet-500/20'
-                      : 'border-gray-800 bg-gray-900/60 hover:border-gray-600 hover:bg-gray-800/60'
+                      ? 'border-accent-500/40 bg-accent-500/10 ring-1 ring-accent-500/20'
+                      : 'border-border bg-surface-50/60 hover:border-border-light hover:bg-surface-200/60'
                   )}
                 >
                   <div className={cn(
                     'w-10 h-10 rounded-xl flex items-center justify-center',
-                    workspaceMode === 'ugc' ? 'bg-violet-500/20' : 'bg-gray-800'
+                    workspaceMode === 'ugc' ? 'bg-accent-500/20' : 'bg-surface-200'
                   )}>
-                    <Zap className={cn('w-5 h-5', workspaceMode === 'ugc' ? 'text-violet-400' : 'text-gray-500')} />
+                    <Zap className={cn('w-5 h-5', workspaceMode === 'ugc' ? 'text-accent-400' : 'text-text-muted')} />
                   </div>
                   <div>
-                    <p className={cn('text-sm font-semibold', workspaceMode === 'ugc' ? 'text-white' : 'text-gray-300')}>UGC</p>
-                    <p className="text-[11px] text-gray-500">Product-to-video pipeline</p>
+                    <p className={cn('text-sm font-semibold', workspaceMode === 'ugc' ? 'text-text-primary' : 'text-text-secondary')}>UGC</p>
+                    <p className="text-[11px] text-text-muted">Product-to-video pipeline</p>
                   </div>
-                  {workspaceMode === 'ugc' && <Check className="w-4 h-4 text-violet-400 ml-auto" />}
+                  {workspaceMode === 'ugc' && <Check className="w-4 h-4 text-accent-400 ml-auto" />}
                 </button>
               </div>
-              <div className="p-4 border-t border-gray-800 text-center">
-                <p className="text-[10px] text-gray-600">Personas & settings are shared</p>
+              <div className="p-4 border-t border-border text-center">
+                <p className="text-[10px] text-text-dim">Personas & settings are shared</p>
               </div>
             </motion.div>
           </>
@@ -1429,16 +1443,16 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
       {/* ================================================================== */}
       {/* MOBILE TOP BAR (visible only on small screens)                     */}
       {/* ================================================================== */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-gray-900 border-b border-gray-800 px-3 py-2 flex items-center justify-between">
-        <button onClick={() => setMobileSidebar(true)} className="p-2 rounded-lg hover:bg-gray-800">
-          <List className="w-5 h-5 text-gray-300" />
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-surface-50 border-b border-border px-3 py-2 flex items-center justify-between">
+        <button onClick={() => setMobileSidebar(true)} className="p-2 rounded-lg hover:bg-surface-200">
+          <List className="w-5 h-5 text-text-secondary" />
         </button>
         <div className="flex items-center gap-2">
-          {workspaceMode === 'studio' ? <Sparkles className="w-4 h-4 text-rose-400" /> : <Zap className="w-4 h-4 text-violet-400" />}
+          {workspaceMode === 'studio' ? <Sparkles className="w-4 h-4 text-brand-400" /> : <Zap className="w-4 h-4 text-accent-400" />}
           <span className="text-sm font-semibold">{selectedPersona?.identity.fullName || (workspaceMode === 'studio' ? 'Creator Studio' : 'UGC Factory')}</span>
         </div>
-        <button onClick={openSettings} className="p-2 rounded-lg hover:bg-gray-800">
-          <Settings className="w-5 h-5 text-gray-300" />
+        <button onClick={openSettings} className="p-2 rounded-lg hover:bg-surface-200">
+          <Settings className="w-5 h-5 text-text-secondary" />
         </button>
       </div>
 
@@ -1465,12 +1479,12 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
               className="md:hidden fixed left-0 top-0 bottom-0 w-[320px] z-50 flex"
             >
               {/* Persona rail inside mobile sidebar */}
-              <div className="w-[60px] flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col items-center py-3 gap-2">
+              <div className="w-[60px] flex-shrink-0 bg-surface-50 border-r border-border flex flex-col items-center py-3 gap-2">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2">
                   <img src="/logo.png" alt="CS" className="w-8 h-8" />
                 </div>
-                <button onClick={handleNewPersona} className="w-9 h-9 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center flex-shrink-0 mb-1">
-                  <Plus className="w-4 h-4 text-gray-400" />
+                <button onClick={handleNewPersona} className="w-9 h-9 rounded-full bg-surface-200 hover:bg-surface-300 flex items-center justify-center flex-shrink-0 mb-1">
+                  <Plus className="w-4 h-4 text-text-muted" />
                 </button>
                 <div className="flex-1 overflow-y-auto space-y-2 w-full flex flex-col items-center scrollbar-hide">
                   {personas.map(p => (
@@ -1478,40 +1492,40 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                       key={p.id}
                       onClick={() => { selectPersona(p.id); }}
                       className={cn(
-                        'w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold transition-all flex-shrink-0 bg-gray-800',
-                        p.id === selectedPersonaId && 'ring-2 ring-white ring-offset-1 ring-offset-gray-900'
+                        'w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold transition-all flex-shrink-0 bg-surface-200',
+                        p.id === selectedPersonaId && 'ring-2 ring-white ring-offset-1 ring-offset-surface-50'
                       )}
                     >
                       {p.referenceImageUrl ? (
                         <img src={p.referenceImageUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
                       ) : (
-                        <span className="text-gray-300">{getInitials(p.identity.fullName)}</span>
+                        <span className="text-text-secondary">{getInitials(p.identity.fullName)}</span>
                       )}
                     </button>
                   ))}
                 </div>
               </div>
               {/* Content sidebar inside mobile */}
-              <div className="flex-1 bg-gray-950 flex flex-col overflow-hidden">
+              <div className="flex-1 bg-surface-0 flex flex-col overflow-hidden">
                 {selectedPersona && (
-                  <div className="p-3 border-b border-gray-800">
+                  <div className="p-3 border-b border-border">
                     <div className="flex items-start justify-between">
                       <div className="min-w-0">
-                        <h2 className="text-sm font-semibold text-white truncate">{selectedPersona.identity.fullName}</h2>
-                        <p className="text-xs text-gray-400 truncate">{selectedPersona.identity.profession}</p>
+                        <h2 className="text-sm font-semibold text-text-primary truncate">{selectedPersona.identity.fullName}</h2>
+                        <p className="text-xs text-text-muted truncate">{selectedPersona.identity.profession}</p>
                       </div>
-                      <button onClick={() => { openPersonaEditor(); setMobileSidebar(false); }} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400">
+                      <button onClick={() => { openPersonaEditor(); setMobileSidebar(false); }} className="p-1.5 rounded-lg hover:bg-surface-200 text-text-muted">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
                 )}
-                <div className="p-2 space-y-1.5 border-b border-gray-800">
+                <div className="p-2 space-y-1.5 border-b border-border">
                   <div className="flex gap-1.5">
-                    <button onClick={() => { setShowNewPostPrompt(true); setMobileSidebar(false); }} disabled={!selectedPersonaId} className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-white text-gray-900 rounded-lg text-xs font-medium">
+                    <button onClick={() => { setShowNewPostPrompt(true); setMobileSidebar(false); }} disabled={!selectedPersonaId} className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-accent-600 text-white rounded-lg text-xs font-medium">
                       <Plus className="w-3.5 h-3.5" /> New Post
                     </button>
-                    <button onClick={() => { setShowImportModal(true); setMobileSidebar(false); }} className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-gray-800 rounded-lg text-xs font-medium text-gray-300">
+                    <button onClick={() => { setShowImportModal(true); setMobileSidebar(false); }} className="flex-1 flex items-center justify-center gap-1 px-2 py-2 bg-surface-200 rounded-lg text-xs font-medium text-text-secondary">
                       <Upload className="w-3.5 h-3.5" /> Import
                     </button>
                   </div>
@@ -1522,18 +1536,18 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                     const isPublished = day.status === 'published';
                     return (
                       <button key={day.id} onClick={() => selectDay(day.id)} className={cn(
-                        'w-full flex items-center gap-2.5 px-3 py-2 text-left border-b border-gray-800/50',
+                        'w-full flex items-center gap-2.5 px-3 py-2 text-left border-b border-border/50',
                         day.id === selectedDayId ? 'bg-white/5 border-l-2 border-l-white' : ''
                       )}>
-                        <div className="w-9 h-9 rounded-lg bg-gray-800 flex flex-col items-center justify-center flex-shrink-0">
-                          <span className="text-[8px] font-bold text-gray-400">{month}</span>
-                          <span className="text-xs font-bold text-white">{dayNum}</span>
+                        <div className="w-9 h-9 rounded-lg bg-surface-200 flex flex-col items-center justify-center flex-shrink-0">
+                          <span className="text-[8px] font-bold text-text-muted">{month}</span>
+                          <span className="text-xs font-bold text-text-primary">{dayNum}</span>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs text-white truncate">{day.theme || 'Untitled'}</p>
+                          <p className="text-xs text-text-primary truncate">{day.theme || 'Untitled'}</p>
                           <div className="flex items-center gap-1">
                             <span className={cn('text-[9px] px-1 py-0.5 rounded-full font-medium', STATUS_COLORS[day.status])}>{day.status}</span>
-                            {isPublished && <Lock className="w-2.5 h-2.5 text-rose-400" />}
+                            {isPublished && <Lock className="w-2.5 h-2.5 text-brand-400" />}
                           </div>
                         </div>
                         {day.generatedImageUrl && (
@@ -1552,18 +1566,18 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
       {/* ================================================================== */}
       {/* COLUMN 1: Persona Rail (hidden on mobile)                          */}
       {/* ================================================================== */}
-      <div className={cn("hidden md:flex w-[72px] flex-shrink-0 bg-gray-900 border-r border-gray-800 flex-col items-center py-3 gap-2 transition-all duration-300", rightPanel !== 'none' && "blur-sm opacity-50 pointer-events-none")}>
+      <div className={cn("hidden md:flex w-[72px] flex-shrink-0 bg-surface-50 border-r border-border flex-col items-center py-3 gap-2 transition-all duration-300", rightPanel !== 'none' && "blur-sm opacity-50 pointer-events-none")}>
         {/* Logo — click to switch workspace */}
         <button
           onClick={() => setShowModeSwitcher(prev => !prev)}
           title="Switch workspace"
-          className="w-10 h-10 rounded-xl flex items-center justify-center mb-2 hover:ring-2 hover:ring-violet-500/50 transition-all relative"
+          className="w-10 h-10 rounded-xl flex items-center justify-center mb-2 hover:ring-2 hover:ring-accent-500/50 transition-all relative"
         >
           <img src="/logo.png" alt="Creator Studio" className="w-9 h-9" />
           {/* Mode indicator dot */}
           <span className={cn(
-            'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-900',
-            workspaceMode === 'studio' ? 'bg-rose-500' : 'bg-violet-500'
+            'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface-50',
+            workspaceMode === 'studio' ? 'bg-brand-500 text-white' : 'bg-accent-500'
           )} />
         </button>
 
@@ -1571,9 +1585,9 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
         <button
           onClick={handleNewPersona}
           title="Add new persona"
-          className="w-10 h-10 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors mb-1"
+          className="w-10 h-10 rounded-full bg-surface-200 hover:bg-surface-300 flex items-center justify-center transition-colors mb-1"
         >
-          <Plus className="w-5 h-5 text-gray-400" />
+          <Plus className="w-5 h-5 text-text-muted" />
         </button>
 
         {/* Persona Avatars */}
@@ -1591,24 +1605,24 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
             return sortedPersonas.map((p, idx) => (
               <React.Fragment key={p.id}>
                 {pinnedCount > 0 && idx === pinnedCount && (
-                  <div className="w-8 border-t border-gray-700/60 my-0.5" />
+                  <div className="w-8 border-t border-border-light/60 my-0.5" />
                 )}
                 <button
                   onClick={() => selectPersona(p.id)}
                   title={p.identity.fullName}
                   className={cn(
                     'relative w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold transition-all flex-shrink-0',
-                    'bg-gray-800 hover:bg-gray-700',
-                    p.id === selectedPersonaId && 'ring-2 ring-white ring-offset-2 ring-offset-gray-900'
+                    'bg-surface-200 hover:bg-surface-300',
+                    p.id === selectedPersonaId && 'ring-2 ring-white ring-offset-2 ring-offset-surface-50'
                   )}
                 >
                   {p.referenceImageUrl ? (
                     <img src={p.referenceImageUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
                   ) : (
-                    <span className="text-gray-300">{getInitials(p.identity.fullName)}</span>
+                    <span className="text-text-secondary">{getInitials(p.identity.fullName)}</span>
                   )}
                   {pinnedPersonaIds.has(p.id) && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-violet-500 border-2 border-gray-900" />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-accent-500 border-2 border-surface-50" />
                   )}
                 </button>
               </React.Fragment>
@@ -1623,7 +1637,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
             title="Production Library"
             className={cn(
               'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
-              showLibrary ? 'bg-violet-500/20 text-violet-400 ring-1 ring-violet-500/30' : 'bg-gray-800 hover:bg-gray-700 text-gray-400'
+              showLibrary ? 'bg-accent-500/20 text-accent-400 ring-1 ring-accent-500/30' : 'bg-surface-200 hover:bg-surface-300 text-text-muted'
             )}
           >
             <BookOpen className="w-5 h-5" />
@@ -1636,7 +1650,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
           title="Settings"
           className={cn(
             'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
-            rightPanel === 'settings' ? 'bg-white text-gray-900' : 'bg-gray-800 hover:bg-gray-700 text-gray-400'
+            rightPanel === 'settings' ? 'bg-accent-600 text-white' : 'bg-surface-200 hover:bg-surface-300 text-text-muted'
           )}
         >
           <Settings className="w-5 h-5" />
@@ -1646,7 +1660,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
       {/* ================================================================== */}
       {/* COLUMN 2: Content Sidebar (hidden on mobile)                       */}
       {/* ================================================================== */}
-      <div className={cn("hidden md:flex w-[280px] flex-shrink-0 bg-gray-900/60 border-r border-gray-800 flex-col transition-all duration-300", rightPanel !== 'none' && "blur-sm opacity-50 pointer-events-none")}>
+      <div className={cn("hidden md:flex w-[280px] flex-shrink-0 bg-surface-50/60 border-r border-border flex-col transition-all duration-300", rightPanel !== 'none' && "blur-sm opacity-50 pointer-events-none")}>
 
         {/* Production Library sidebar — replaces nav when open */}
         {showLibrary ? (
@@ -1659,17 +1673,17 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
         <>
         {/* Persona Header */}
         {selectedPersona ? (
-          <div className="p-4 border-b border-gray-800">
+          <div className="p-4 border-b border-border">
             <div className="flex items-start justify-between">
               <div className="min-w-0">
-                <h2 className="text-base font-semibold text-white truncate">
+                <h2 className="text-base font-semibold text-text-primary truncate">
                   {selectedPersona.identity.fullName}
                 </h2>
-                <p className="text-sm text-gray-400 truncate">{selectedPersona.identity.profession}</p>
+                <p className="text-sm text-text-muted truncate">{selectedPersona.identity.profession}</p>
               </div>
               <button
                 onClick={openPersonaEditor}
-                className="ml-2 p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors flex-shrink-0"
+                className="ml-2 p-1.5 rounded-lg hover:bg-surface-200 text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
                 title="Edit persona"
               >
                 <Pencil className="w-4 h-4" />
@@ -1677,33 +1691,33 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
             </div>
           </div>
         ) : (
-          <div className="p-4 border-b border-gray-800">
-            <p className="text-sm text-gray-500">No persona selected</p>
+          <div className="p-4 border-b border-border">
+            <p className="text-sm text-text-muted">No persona selected</p>
           </div>
         )}
 
         {/* Action Buttons — changes based on workspace mode */}
         {workspaceMode === 'studio' ? (
-          <div className="p-3 space-y-2 border-b border-gray-800">
+          <div className="p-3 space-y-2 border-b border-border">
             <div className="flex gap-2">
               <button
                 onClick={() => setShowNewPostPrompt(true)}
                 disabled={!selectedPersonaId}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-accent-600 text-white hover:bg-accent-500 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors"
               >
                 <Plus className="w-4 h-4" /> New Post
               </button>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setShowImportModal(true)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium text-gray-300 transition-colors">
+              <button onClick={() => setShowImportModal(true)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-surface-200 hover:bg-surface-300 rounded-lg text-sm font-medium text-text-secondary transition-colors">
                 <Upload className="w-4 h-4" /> Import
               </button>
-              <div className="flex bg-gray-800 rounded-lg overflow-hidden">
+              <div className="flex bg-surface-200 rounded-lg overflow-hidden">
                 <button
                   onClick={() => setViewMode('list')}
                   className={cn(
                     'px-3 py-2 text-sm transition-colors',
-                    viewMode === 'list' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white'
+                    viewMode === 'list' ? 'bg-accent-600 text-white' : 'text-text-muted hover:text-text-primary'
                   )}
                   title="List view"
                 >
@@ -1713,7 +1727,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                   onClick={() => setViewMode('calendar')}
                   className={cn(
                     'px-3 py-2 text-sm transition-colors',
-                    viewMode === 'calendar' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white'
+                    viewMode === 'calendar' ? 'bg-accent-600 text-white' : 'text-text-muted hover:text-text-primary'
                   )}
                   title="Calendar view"
                 >
@@ -1723,20 +1737,20 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
             </div>
           </div>
         ) : (
-          <div className="p-3 space-y-2 border-b border-gray-800">
+          <div className="p-3 space-y-2 border-b border-border">
             <button
               onClick={() => { setShowNewUGCPrompt(true); setUgcProductUrl(''); setUgcAffiliateUrl(''); }}
               disabled={!selectedPersonaId}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 rounded-lg text-sm font-medium text-white transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-accent-600 hover:bg-accent-500 disabled:opacity-40 rounded-lg text-sm font-medium text-white transition-colors"
             >
               <Plus className="w-4 h-4" /> New Video Package
             </button>
-            <div className="flex bg-gray-800 rounded-lg overflow-hidden">
+            <div className="flex bg-surface-200 rounded-lg overflow-hidden">
               <button
                 onClick={() => setViewMode('list')}
                 className={cn(
                   'flex-1 px-3 py-2 text-sm transition-colors flex items-center justify-center gap-1.5',
-                  viewMode === 'list' ? 'bg-violet-500 text-white' : 'text-gray-400 hover:text-white'
+                  viewMode === 'list' ? 'bg-accent-500 text-white' : 'text-text-muted hover:text-text-primary'
                 )}
                 title="List view"
               >
@@ -1746,7 +1760,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                 onClick={() => setViewMode('calendar')}
                 className={cn(
                   'flex-1 px-3 py-2 text-sm transition-colors flex items-center justify-center gap-1.5',
-                  viewMode === 'calendar' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white'
+                  viewMode === 'calendar' ? 'bg-accent-600 text-white' : 'text-text-muted hover:text-text-primary'
                 )}
                 title="Calendar view"
               >
@@ -1759,7 +1773,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
         {/* Day List */}
         <div className="flex-1 overflow-y-auto">
           {personaDays.length === 0 ? (
-            <div className="p-4 text-center text-gray-500 text-sm">
+            <div className="p-4 text-center text-text-muted text-sm">
               No content days yet. Click "New Post" to start.
             </div>
           ) : (
@@ -1796,34 +1810,34 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                     }
                   }}
                   className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-gray-800/50 group/sidebar cursor-pointer',
-                    day.id === selectedDayId ? 'bg-white/5 border-l-2 border-l-white' : 'hover:bg-gray-800/50'
+                    'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-border/50 group/sidebar cursor-pointer',
+                    day.id === selectedDayId ? 'bg-white/5 border-l-2 border-l-white' : 'hover:bg-surface-200/50'
                   )}
                   onClick={() => selectDay(day.id)}
                 >
                   {/* Date box — acts as drag affordance */}
                   <div className={cn(
-                    "w-10 h-10 rounded-lg bg-gray-800 flex flex-col items-center justify-center flex-shrink-0 transition-colors",
-                    !isPublished && "group-hover/sidebar:bg-gray-700 cursor-grab active:cursor-grabbing"
+                    "w-10 h-10 rounded-lg bg-surface-200 flex flex-col items-center justify-center flex-shrink-0 transition-colors",
+                    !isPublished && "group-hover/sidebar:bg-surface-300 cursor-grab active:cursor-grabbing"
                   )}>
-                    <span className="text-[9px] font-bold text-gray-400 leading-none">{month}</span>
-                    <span className="text-sm font-bold text-white leading-tight">{dayNum}</span>
+                    <span className="text-[9px] font-bold text-text-muted leading-none">{month}</span>
+                    <span className="text-sm font-bold text-text-primary leading-tight">{dayNum}</span>
                   </div>
 
                   {/* Content */}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-white truncate">{day.theme || 'Untitled'}</p>
+                    <p className="text-sm text-text-primary truncate">{day.theme || 'Untitled'}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium', STATUS_COLORS[day.status])}>
                         {day.status}
                       </span>
-                      {isPublished && <Lock className="w-3 h-3 text-rose-400" />}
+                      {isPublished && <Lock className="w-3 h-3 text-brand-400" />}
                       {day.isGoodToPost && !isPublished && <Check className="w-3 h-3 text-emerald-400" />}
                       {/* Content type icon */}
-                      {day.contentType === 'Photo' && <Image className="w-3 h-3 text-gray-500" />}
-                      {day.contentType === 'Video' && <Video className="w-3 h-3 text-gray-500" />}
-                      {day.contentType === 'Carousel' && <LayoutGrid className="w-3 h-3 text-gray-500" />}
-                      <span className="text-[10px] text-gray-500">
+                      {day.contentType === 'Photo' && <Image className="w-3 h-3 text-text-muted" />}
+                      {day.contentType === 'Video' && <Video className="w-3 h-3 text-text-muted" />}
+                      {day.contentType === 'Carousel' && <LayoutGrid className="w-3 h-3 text-text-muted" />}
+                      <span className="text-[10px] text-text-muted">
                         {day.platforms.map(p => PLATFORM_LETTERS[p]).join('/')}
                       </span>
                     </div>
@@ -1843,7 +1857,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
 
         {/* Saving indicator */}
         {saving && (
-          <div className="p-2 border-t border-gray-800 flex items-center justify-center gap-1.5 text-xs text-gray-400">
+          <div className="p-2 border-t border-border flex items-center justify-center gap-1.5 text-xs text-text-muted">
             <Loader2 className="w-3 h-3 animate-spin" /> Saving...
           </div>
         )}
@@ -1860,7 +1874,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
           <div className="bg-red-500/10 border-b border-red-500/30 px-4 py-2 flex items-center gap-2 text-red-400 text-sm">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span className="flex-1">{error}</span>
-            <button onClick={() => setError('')} className="hover:text-white"><X className="w-4 h-4" /></button>
+            <button onClick={() => setError('')} className="hover:text-text-primary"><X className="w-4 h-4" /></button>
           </div>
         )}
 
@@ -1877,10 +1891,10 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
               <div className="max-w-3xl mx-auto space-y-4 py-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-rose-400" /> New Post
+                  <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-brand-400" /> New Post
                   </h3>
-                  <button onClick={() => setShowNewPostPrompt(false)} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400">
+                  <button onClick={() => setShowNewPostPrompt(false)} className="p-1.5 rounded-lg hover:bg-surface-200 text-text-muted">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
@@ -1889,14 +1903,14 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                 <textarea
                   value={newPostPromptText}
                   onChange={e => setNewPostPromptText(e.target.value)}
-                  className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 text-sm min-h-[100px] resize-y outline-none focus:ring-1 focus:ring-rose-500/50 focus:border-rose-500/50"
+                  className="w-full bg-surface-200/60 border border-border-light rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm min-h-[100px] resize-y outline-none focus:ring-1 focus:ring-brand-500/50 focus:border-brand-500/50"
                   placeholder={`Describe this post... e.g., "${selectedPersona.identity.fullName} is traveling to Atlanta, visiting City Market downtown, nice motivational quotes about how beautiful the place is"`}
                   disabled={isAIGenerating}
                 />
 
                 {/* Row 2: Target Audience (selectable cards) */}
                 <div>
-                  <label className="block text-xs text-gray-400 font-medium mb-2">Target Audience</label>
+                  <label className="block text-xs text-text-muted font-medium mb-2">Target Audience</label>
                   {(selectedPersona.targetAudiences && selectedPersona.targetAudiences.length > 0) ? (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       {selectedPersona.targetAudiences.map(seg => (
@@ -1907,20 +1921,20 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                           className={cn(
                             'text-left px-3 py-2.5 rounded-xl border transition-all',
                             selectedAudienceSegment === seg.segmentName
-                              ? 'border-rose-500 bg-rose-500/10 ring-1 ring-rose-500/30'
-                              : 'border-gray-700 bg-gray-800/40 hover:border-gray-500'
+                              ? 'border-brand-500 bg-brand-500/10 ring-1 ring-brand-500/30'
+                              : 'border-border-light bg-surface-200/40 hover:border-border-light'
                           )}
                         >
-                          <p className={cn('text-sm font-medium', selectedAudienceSegment === seg.segmentName ? 'text-rose-300' : 'text-gray-200')}>{seg.segmentName}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{seg.coreAspiration}</p>
-                          <p className="text-[10px] text-gray-600 mt-0.5">{seg.ageRange}{seg.genderSkew ? ` · ${seg.genderSkew}` : ''}</p>
+                          <p className={cn('text-sm font-medium', selectedAudienceSegment === seg.segmentName ? 'text-brand-300' : 'text-text-primary')}>{seg.segmentName}</p>
+                          <p className="text-xs text-text-muted mt-0.5">{seg.coreAspiration}</p>
+                          <p className="text-[10px] text-text-dim mt-0.5">{seg.ageRange}{seg.genderSkew ? ` · ${seg.genderSkew}` : ''}</p>
                         </button>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-xs text-gray-500 bg-gray-800/40 rounded-xl px-3 py-3 border border-gray-700">
+                    <div className="text-xs text-text-muted bg-surface-200/40 rounded-xl px-3 py-3 border border-border-light">
                       No target audiences defined.{' '}
-                      <button onClick={() => setRightPanel('persona-editor')} className="text-rose-400 hover:text-rose-300 underline">Edit persona</button>
+                      <button onClick={() => setRightPanel('persona-editor')} className="text-brand-400 hover:text-brand-300 underline">Edit persona</button>
                       {' '}to set them up.
                     </div>
                   )}
@@ -1928,7 +1942,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
 
                 {/* Row 3: Content Focus (tag pills) */}
                 <div>
-                  <label className="block text-xs text-gray-400 font-medium mb-2">Content Focus</label>
+                  <label className="block text-xs text-text-muted font-medium mb-2">Content Focus</label>
                   <div className="flex flex-wrap gap-1.5">
                     {(() => {
                       const personaThemes = selectedPersona?.contentThemes || [];
@@ -1951,8 +1965,8 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                           className={cn(
                             'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
                             selectedContentFocus.includes(tag)
-                              ? 'border-rose-500 bg-rose-500/15 text-rose-300'
-                              : 'border-gray-700 bg-gray-800/40 text-gray-400 hover:text-gray-200 hover:border-gray-500'
+                              ? 'border-brand-500 bg-brand-500/15 text-brand-300'
+                              : 'border-border-light bg-surface-200/40 text-text-muted hover:text-text-primary hover:border-border-light'
                           )}
                         >
                           {tag}
@@ -1960,7 +1974,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                       ));
                     })()}
                   </div>
-                  <p className="text-[10px] text-gray-600 mt-1">Select 1-2 themes</p>
+                  <p className="text-[10px] text-text-dim mt-1">Select 1-2 themes</p>
                 </div>
 
                 {/* Row 4: Generate button */}
@@ -1968,13 +1982,13 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                   <button
                     onClick={() => handleAIContentPlan(newPostPromptText, selectedAudienceSegment, selectedContentFocus)}
                     disabled={!newPostPromptText.trim() || isAIGenerating}
-                    className="px-6 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-40 text-sm font-semibold text-white transition-colors flex items-center gap-2"
+                    className="px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 disabled:opacity-40 text-sm font-semibold text-white transition-colors flex items-center gap-2"
                   >
                     {isAIGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate Post</>}
                   </button>
                   <button
                     onClick={() => { handleNewDay(); setShowNewPostPrompt(false); }}
-                    className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                    className="text-xs text-text-muted hover:text-text-secondary transition-colors"
                   >
                     or create blank post
                   </button>
@@ -1997,21 +2011,21 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
               <div className="max-w-3xl mx-auto space-y-5 py-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-violet-400" /> New Video Package
+                  <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-accent-400" /> New Video Package
                   </h3>
-                  <button onClick={() => setShowNewUGCPrompt(false)} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400">
+                  <button onClick={() => setShowNewUGCPrompt(false)} className="p-1.5 rounded-lg hover:bg-surface-200 text-text-muted">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
                 {/* Product URL / Description */}
                 <div>
-                  <label className="block text-xs text-gray-400 font-medium mb-2">Product URL or Description</label>
+                  <label className="block text-xs text-text-muted font-medium mb-2">Product URL or Description</label>
                   <textarea
                     value={ugcProductUrl}
                     onChange={e => setUgcProductUrl(e.target.value)}
-                    className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 text-sm min-h-[80px] resize-y outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/50"
+                    className="w-full bg-surface-200/60 border border-border-light rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm min-h-[80px] resize-y outline-none focus:ring-1 focus:ring-accent-500/50 focus:border-accent-500/50"
                     placeholder="Paste an Amazon or TikTok Shop URL, or describe the product with details (name, price, features, reviews)..."
                     disabled={isUGCGenerating}
                   />
@@ -2019,23 +2033,23 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
 
                 {/* Affiliate URL (optional) */}
                 <div>
-                  <label className="block text-xs text-gray-400 font-medium mb-2">
-                    Affiliate Link <span className="text-gray-600">(optional)</span>
+                  <label className="block text-xs text-text-muted font-medium mb-2">
+                    Affiliate Link <span className="text-text-dim">(optional)</span>
                   </label>
                   <input
                     type="url"
                     value={ugcAffiliateUrl}
                     onChange={e => setUgcAffiliateUrl(e.target.value)}
-                    className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 text-sm outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50"
+                    className="w-full bg-surface-200/60 border border-border-light rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50"
                     placeholder="https://amazon.com/dp/...?tag=your-affiliate-tag"
                     disabled={isUGCGenerating}
                   />
-                  <p className="text-[10px] text-gray-600 mt-1">Will be included in TikTok & Instagram captions with disclosure</p>
+                  <p className="text-[10px] text-text-dim mt-1">Will be included in TikTok & Instagram captions with disclosure</p>
                 </div>
 
                 {/* Mode Toggle */}
                 <div>
-                  <label className="block text-xs text-gray-400 font-medium mb-2">Pipeline Mode</label>
+                  <label className="block text-xs text-text-muted font-medium mb-2">Pipeline Mode</label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setUgcMode('auto')}
@@ -2043,12 +2057,12 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                       className={cn(
                         'flex-1 px-4 py-3 rounded-xl border text-left transition-all',
                         ugcMode === 'auto'
-                          ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500/30'
-                          : 'border-gray-700 bg-gray-800/40 hover:border-gray-500'
+                          ? 'border-accent-500 bg-accent-500/10 ring-1 ring-accent-500/30'
+                          : 'border-border-light bg-surface-200/40 hover:border-border-light'
                       )}
                     >
-                      <p className={cn('text-sm font-medium', ugcMode === 'auto' ? 'text-violet-300' : 'text-gray-200')}>Auto</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Run all 6 steps automatically</p>
+                      <p className={cn('text-sm font-medium', ugcMode === 'auto' ? 'text-accent-300' : 'text-text-primary')}>Auto</p>
+                      <p className="text-xs text-text-muted mt-0.5">Run all 6 steps automatically</p>
                     </button>
                     <button
                       onClick={() => setUgcMode('hitl')}
@@ -2056,19 +2070,19 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                       className={cn(
                         'flex-1 px-4 py-3 rounded-xl border text-left transition-all',
                         ugcMode === 'hitl'
-                          ? 'border-violet-500 bg-violet-500/10 ring-1 ring-violet-500/30'
-                          : 'border-gray-700 bg-gray-800/40 hover:border-gray-500'
+                          ? 'border-accent-500 bg-accent-500/10 ring-1 ring-accent-500/30'
+                          : 'border-border-light bg-surface-200/40 hover:border-border-light'
                       )}
                     >
-                      <p className={cn('text-sm font-medium', ugcMode === 'hitl' ? 'text-violet-300' : 'text-gray-200')}>Human-in-the-Loop</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Review & edit each step [Coming Soon]</p>
+                      <p className={cn('text-sm font-medium', ugcMode === 'hitl' ? 'text-accent-300' : 'text-text-primary')}>Human-in-the-Loop</p>
+                      <p className="text-xs text-text-muted mt-0.5">Review & edit each step [Coming Soon]</p>
                     </button>
                   </div>
                 </div>
 
                 {/* Pipeline steps preview */}
                 <div>
-                  <label className="block text-xs text-gray-400 font-medium mb-2">Pipeline Steps</label>
+                  <label className="block text-xs text-text-muted font-medium mb-2">Pipeline Steps</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { icon: '1', label: 'Product Intel', desc: 'Features, pricing, reviews' },
@@ -2078,11 +2092,11 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                       { icon: '5', label: 'Audio', desc: 'ElevenLabs + trending sounds' },
                       { icon: '6', label: 'Metadata', desc: 'Captions, hashtags, schedule' },
                     ].map(step => (
-                      <div key={step.icon} className="flex items-start gap-2 px-3 py-2 rounded-lg border border-gray-800 bg-gray-800/30">
-                        <span className="w-5 h-5 rounded-full bg-violet-500/15 text-violet-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">{step.icon}</span>
+                      <div key={step.icon} className="flex items-start gap-2 px-3 py-2 rounded-lg border border-border bg-surface-200/30">
+                        <span className="w-5 h-5 rounded-full bg-accent-500/15 text-accent-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">{step.icon}</span>
                         <div>
-                          <p className="text-xs font-medium text-gray-300">{step.label}</p>
-                          <p className="text-[10px] text-gray-600">{step.desc}</p>
+                          <p className="text-xs font-medium text-text-secondary">{step.label}</p>
+                          <p className="text-[10px] text-text-dim">{step.desc}</p>
                         </div>
                       </div>
                     ))}
@@ -2090,13 +2104,13 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                 </div>
 
                 {/* Persona info */}
-                <div className="flex items-center gap-3 bg-gray-800/40 rounded-xl px-4 py-3 border border-gray-700">
+                <div className="flex items-center gap-3 bg-surface-200/40 rounded-xl px-4 py-3 border border-border-light">
                   {selectedPersona.referenceImageUrl && (
-                    <img src={selectedPersona.referenceImageUrl} alt="" className="w-10 h-10 rounded-full object-cover border border-gray-600" />
+                    <img src={selectedPersona.referenceImageUrl} alt="" className="w-10 h-10 rounded-full object-cover border border-border-light" />
                   )}
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-white">{selectedPersona.identity.fullName}</p>
-                    <p className="text-xs text-gray-500">Character lock will be built from this persona's appearance</p>
+                    <p className="text-sm font-medium text-text-primary">{selectedPersona.identity.fullName}</p>
+                    <p className="text-xs text-text-muted">Character lock will be built from this persona's appearance</p>
                   </div>
                 </div>
 
@@ -2176,7 +2190,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                       }
                     }}
                     disabled={!ugcProductUrl.trim() || isUGCGenerating}
-                    className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-sm font-semibold text-white transition-colors flex items-center gap-2"
+                    className="px-6 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-500 disabled:opacity-40 text-sm font-semibold text-white transition-colors flex items-center gap-2"
                   >
                     {isUGCGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate Video Package</>}
                   </button>
@@ -2240,9 +2254,9 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
             />
           )
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="flex-1 flex items-center justify-center text-text-muted">
             <div className="text-center">
-              <FileText className="w-12 h-12 mx-auto mb-3 text-gray-700" />
+              <FileText className="w-12 h-12 mx-auto mb-3 text-text-dim" />
               <p className="text-lg">Select a post or create a new one</p>
             </div>
           </div>
@@ -2259,7 +2273,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="absolute inset-0 z-30 bg-gray-950/95 backdrop-blur-sm overflow-y-auto"
+              className="absolute inset-0 z-30 bg-surface-0/95 backdrop-blur-sm overflow-y-auto"
             >
               <PersonaEditorPanel
                 persona={editedPersona}
@@ -2295,7 +2309,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="absolute inset-0 z-30 bg-gray-950/95 backdrop-blur-sm overflow-y-auto"
+              className="absolute inset-0 z-30 bg-surface-0/95 backdrop-blur-sm overflow-y-auto"
             >
               <SettingsPanel
                 settings={editedSettings}
@@ -2336,18 +2350,18 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4"
+              className="bg-surface-50 border border-border-light rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-rose-400" /> AI Content Plan
+                <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-brand-400" /> AI Content Plan
                 </h3>
-                <button onClick={() => setShowAIPromptModal(false)} disabled={isAIGenerating} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400">
+                <button onClick={() => setShowAIPromptModal(false)} disabled={isAIGenerating} className="p-1.5 rounded-lg hover:bg-surface-200 text-text-muted">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-text-muted">
                 Describe a content idea and AI will generate a full content day plan for {selectedPersona?.identity.fullName || 'your persona'}.
               </p>
               <textarea
@@ -2361,14 +2375,14 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                 <button
                   onClick={() => setShowAIPromptModal(false)}
                   disabled={isAIGenerating}
-                  className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-800 transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm text-text-muted hover:bg-surface-200 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAIContentPlan}
                   disabled={!aiPrompt.trim() || isAIGenerating}
-                  className="px-4 py-2 rounded-lg bg-rose-500 hover:bg-rose-400 disabled:opacity-40 text-sm font-medium text-white transition-colors flex items-center gap-2"
+                  className="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-400 disabled:opacity-40 text-sm font-medium text-white transition-colors flex items-center gap-2"
                 >
                   {isAIGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate</>}
                 </button>
@@ -2391,14 +2405,14 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4"
+              className="bg-surface-50 border border-border-light rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-gray-300" /> Import from Google Sheets
+                <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-text-secondary" /> Import from Google Sheets
                 </h3>
-                <button onClick={() => setShowImportModal(false)} disabled={isAIGenerating} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400">
+                <button onClick={() => setShowImportModal(false)} disabled={isAIGenerating} className="p-1.5 rounded-lg hover:bg-surface-200 text-text-muted">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -2443,12 +2457,12 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                   />
                 </Field>
               </div>
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
                 <input
                   type="checkbox"
                   checked={importAvoidDuplicates}
                   onChange={e => setImportAvoidDuplicates(e.target.checked)}
-                  className="rounded border-gray-600 bg-gray-800 text-rose-500 focus:ring-rose-500"
+                  className="rounded border-border-light bg-surface-200 text-brand-500 focus:ring-brand-500"
                   disabled={isAIGenerating}
                 />
                 Avoid duplicates
@@ -2457,14 +2471,14 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                 <button
                   onClick={() => setShowImportModal(false)}
                   disabled={isAIGenerating}
-                  className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-800 transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm text-text-muted hover:bg-surface-200 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleImportSheet}
                   disabled={!importSheetId.trim() || isAIGenerating}
-                  className="px-4 py-2 rounded-lg bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-40 text-sm font-medium transition-colors flex items-center gap-2"
+                  className="px-4 py-2 rounded-lg bg-accent-600 text-white hover:bg-accent-500 disabled:opacity-40 text-sm font-medium transition-colors flex items-center gap-2"
                 >
                   {isAIGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> Importing...</> : <><Upload className="w-4 h-4" /> Import</>}
                 </button>
@@ -2525,7 +2539,7 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
             />
             <button
               onClick={() => setLightboxUrl(null)}
-              className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+              className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-text-primary transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
@@ -2596,12 +2610,12 @@ function PostCard({
       <div className="max-w-6xl mx-auto p-4 md:p-6 pb-20">
         {/* Published banner */}
         {isPublished && (
-          <div className="flex items-center justify-between bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3 mb-4">
-            <div className="flex items-center gap-2 text-rose-300 text-sm">
+          <div className="flex items-center justify-between bg-brand-500/10 border border-brand-500/20 rounded-xl px-4 py-3 mb-4">
+            <div className="flex items-center gap-2 text-brand-300 text-sm">
               <Lock className="w-4 h-4" />
               <span className="font-medium">Published post — view only</span>
             </div>
-            <button onClick={onDuplicate} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors">
+            <button onClick={onDuplicate} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-text-primary text-xs font-medium transition-colors">
               <Copy className="w-3.5 h-3.5" /> Duplicate
             </button>
           </div>
@@ -2611,20 +2625,20 @@ function PostCard({
         <div className="flex items-center gap-3 mb-4">
           {!isPublished ? (
             <label className="flex items-center gap-2 cursor-pointer group">
-              <Calendar className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors" />
+              <Calendar className="w-4 h-4 text-text-muted group-hover:text-text-primary transition-colors" />
               <input
                 type="date"
                 value={day.date}
                 onChange={e => onUpdateField('date', e.target.value)}
-                className="bg-transparent text-sm text-gray-300 border-none outline-none cursor-pointer hover:text-white transition-colors"
+                className="bg-transparent text-sm text-text-secondary border-none outline-none cursor-pointer hover:text-text-primary transition-colors"
               />
             </label>
           ) : (
-            <span className="text-sm text-gray-400 flex items-center gap-2">
+            <span className="text-sm text-text-muted flex items-center gap-2">
               <Lock className="w-3.5 h-3.5" /> {dateDisplay}
             </span>
           )}
-          <span className="text-xs text-gray-600 bg-gray-800 px-2 py-0.5 rounded">#{day.dayNumber}</span>
+          <span className="text-xs text-text-dim bg-surface-200 px-2 py-0.5 rounded">#{day.dayNumber}</span>
         </div>
 
         {/* Two-column layout: stack on mobile (image first), side-by-side on desktop */}
@@ -2643,21 +2657,21 @@ function PostCard({
                 const isFromDrive = !!day.customMediaUrl;
                 return (
                   <>
-                    <div className="bg-gray-800/30 rounded-xl overflow-hidden">
+                    <div className="bg-surface-200/30 rounded-xl overflow-hidden">
                       {photoUrl ? (
                         <div className="relative cursor-pointer" onClick={() => onOpenLightbox(displayUrl)}>
                           <img src={displayUrl} alt="Preview" className="w-full aspect-[4/5] object-cover" referrerPolicy="no-referrer" />
                           {/* Source badge */}
                           <span className={cn(
                             'absolute top-3 right-3 text-[10px] font-semibold px-2 py-1 rounded-lg',
-                            isFromDrive ? 'bg-gray-900/80 text-gray-300' : 'bg-rose-500/80 text-white'
+                            isFromDrive ? 'bg-surface-50/80 text-text-secondary' : 'bg-brand-500/80 text-white'
                           )}>
                             {isFromDrive ? 'From Drive' : 'AI Generated'}
                           </span>
                           {/* On-screen text position indicator */}
                           {day.onScreenText && (
                             <div className={cn(
-                              'absolute left-1/2 -translate-x-1/2 max-w-[75%] bg-black/70 text-white text-[10px] font-medium px-3 py-1.5 rounded-lg text-center truncate pointer-events-none',
+                              'absolute left-1/2 -translate-x-1/2 max-w-[75%] bg-black/70 text-text-primary text-[10px] font-medium px-3 py-1.5 rounded-lg text-center truncate pointer-events-none',
                               (day.textPosition || 'bottom') === 'top' && 'top-3',
                               (day.textPosition || 'bottom') === 'middle' && 'top-1/2 -translate-y-1/2',
                               (day.textPosition || 'bottom') === 'bottom' && 'bottom-3',
@@ -2669,7 +2683,7 @@ function PostCard({
                           {isFromDrive && (
                             <button
                               onClick={e => { e.stopPropagation(); onUpdateField('customMediaUrl', undefined as any); }}
-                              className="absolute top-3 left-3 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white transition-colors"
+                              className="absolute top-3 left-3 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-text-primary transition-colors"
                               title="Remove Drive image"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -2677,19 +2691,19 @@ function PostCard({
                           )}
                         </div>
                       ) : (
-                        <div className="w-full aspect-[4/5] flex flex-col items-center justify-center gap-3 bg-gray-800/20 border-2 border-dashed border-gray-700 rounded-xl px-4">
-                          <p className="text-sm text-gray-600 text-center leading-relaxed line-clamp-4">{day.sceneDescription || 'No scene described yet'}</p>
+                        <div className="w-full aspect-[4/5] flex flex-col items-center justify-center gap-3 bg-surface-200/20 border-2 border-dashed border-border-light rounded-xl px-4">
+                          <p className="text-sm text-text-dim text-center leading-relaxed line-clamp-4">{day.sceneDescription || 'No scene described yet'}</p>
                         </div>
                       )}
                     </div>
                     {/* Generate + Drive in same row */}
                     <div className="flex gap-2">
-                      <button onClick={onConfirmGenerate} disabled={isGenerating} className="flex-1 px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-sm font-semibold text-white transition-colors flex items-center justify-center gap-2">
+                      <button onClick={onConfirmGenerate} disabled={isGenerating} className="flex-1 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 disabled:opacity-50 text-sm font-semibold text-white transition-colors flex items-center justify-center gap-2">
                         {isGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> {generatingStatus}</> : <><Sparkles className="w-4 h-4" /> {(day.generatedImageUrl || day.customMediaUrl) ? 'Regenerate' : 'Generate'}</>}
                       </button>
                       <button
                         onClick={() => onOpenDrivePicker('single')}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-medium text-gray-300 transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-surface-200 hover:bg-surface-300 text-sm font-medium text-text-secondary transition-colors flex items-center justify-center gap-2"
                       >
                         <FolderOpen className="w-4 h-4" /> From Drive
                       </button>
@@ -2710,30 +2724,30 @@ function PostCard({
                           onClick={() => setSelectedSlideIdx(idx)}
                           className={cn(
                             'flex-shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden transition-all relative',
-                            selectedSlideIdx === idx ? 'border-white ring-1 ring-white/30' : 'border-gray-700 hover:border-gray-500'
+                            selectedSlideIdx === idx ? 'border-white ring-1 ring-white/30' : 'border-border-light hover:border-border-light'
                           )}
                         >
                           {slide.generatedImageUrl ? (
                             <img src={slide.generatedImageUrl} alt="" className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                              <span className="text-lg font-bold text-gray-600">{idx + 1}</span>
+                            <div className="w-full h-full bg-surface-200 flex items-center justify-center">
+                              <span className="text-lg font-bold text-text-dim">{idx + 1}</span>
                             </div>
                           )}
-                          <span className="absolute top-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">{idx + 1}</span>
+                          <span className="absolute top-1 left-1 bg-black/70 text-text-primary text-[9px] font-bold px-1.5 py-0.5 rounded">{idx + 1}</span>
                         </button>
                       ))}
                     </div>
                   )}
                   {/* Selected slide larger preview */}
-                  <div className="bg-gray-800/30 rounded-xl overflow-hidden">
+                  <div className="bg-surface-200/30 rounded-xl overflow-hidden">
                     {day.slides && day.slides[selectedSlideIdx]?.generatedImageUrl ? (
                       <div className="relative cursor-pointer" onClick={() => onOpenLightbox(day.slides![selectedSlideIdx].generatedImageUrl!)}>
                         <img src={day.slides[selectedSlideIdx].generatedImageUrl} alt="" className="w-full aspect-[4/5] object-cover" />
-                        <span className="absolute top-3 left-3 bg-black/70 text-white text-xs font-bold px-2 py-1 rounded-lg">Slide {selectedSlideIdx + 1}</span>
+                        <span className="absolute top-3 left-3 bg-black/70 text-text-primary text-xs font-bold px-2 py-1 rounded-lg">Slide {selectedSlideIdx + 1}</span>
                         {day.slides[selectedSlideIdx]?.onScreenText && (
                           <div className={cn(
-                            'absolute left-1/2 -translate-x-1/2 max-w-[75%] bg-black/70 text-white text-[10px] font-medium px-3 py-1.5 rounded-lg text-center truncate pointer-events-none',
+                            'absolute left-1/2 -translate-x-1/2 max-w-[75%] bg-black/70 text-text-primary text-[10px] font-medium px-3 py-1.5 rounded-lg text-center truncate pointer-events-none',
                             (day.textPosition || 'bottom') === 'top' && 'top-10',
                             (day.textPosition || 'bottom') === 'middle' && 'top-1/2 -translate-y-1/2',
                             (day.textPosition || 'bottom') === 'bottom' && 'bottom-3',
@@ -2743,20 +2757,20 @@ function PostCard({
                         )}
                       </div>
                     ) : (
-                      <div className="w-full aspect-[4/5] flex flex-col items-center justify-center gap-3 bg-gray-800/20 border-2 border-dashed border-gray-700 rounded-xl px-4">
-                        <LayoutGrid className="w-8 h-8 text-gray-600" />
-                        <p className="text-sm text-gray-600 text-center">Slide {selectedSlideIdx + 1} preview</p>
+                      <div className="w-full aspect-[4/5] flex flex-col items-center justify-center gap-3 bg-surface-200/20 border-2 border-dashed border-border-light rounded-xl px-4">
+                        <LayoutGrid className="w-8 h-8 text-text-dim" />
+                        <p className="text-sm text-text-dim text-center">Slide {selectedSlideIdx + 1} preview</p>
                       </div>
                     )}
                   </div>
                   {/* Generate + Drive in same row */}
                   <div className="flex gap-2">
-                    <button onClick={onConfirmGenerate} disabled={isGenerating} className="flex-1 px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-sm font-semibold text-white transition-colors flex items-center justify-center gap-2">
+                    <button onClick={onConfirmGenerate} disabled={isGenerating} className="flex-1 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 disabled:opacity-50 text-sm font-semibold text-white transition-colors flex items-center justify-center gap-2">
                       {isGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> {generatingStatus}</> : <><LayoutGrid className="w-4 h-4" /> Generate Slides</>}
                     </button>
                     <button
                       onClick={() => onOpenDrivePicker('multi')}
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-medium text-gray-300 transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-surface-200 hover:bg-surface-300 text-sm font-medium text-text-secondary transition-colors flex items-center justify-center gap-2"
                     >
                       <FolderOpen className="w-4 h-4" /> From Drive
                     </button>
@@ -2768,28 +2782,28 @@ function PostCard({
               {day.contentType === 'Video' && (
                 <>
                   {/* Thumbnail section */}
-                  <div className="bg-gray-800/20 rounded-xl p-3 space-y-2">
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Thumbnail</p>
+                  <div className="bg-surface-200/20 rounded-xl p-3 space-y-2">
+                    <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Thumbnail</p>
                     {day.thumbnailUrl ? (
                       <div className="relative cursor-pointer" onClick={() => onOpenLightbox(day.thumbnailUrl!)}>
-                        <img src={driveDisplayUrl(day.thumbnailUrl)} alt="Thumbnail" className="w-full aspect-video object-cover rounded-lg border border-gray-700" referrerPolicy="no-referrer" />
+                        <img src={driveDisplayUrl(day.thumbnailUrl)} alt="Thumbnail" className="w-full aspect-video object-cover rounded-lg border border-border-light" referrerPolicy="no-referrer" />
                         <button
                           onClick={e => { e.stopPropagation(); onUpdateField('thumbnailUrl', undefined as any); }}
                           className="absolute top-2 right-2 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center hover:bg-red-500/80 transition-colors"
                         >
-                          <X className="w-3.5 h-3.5 text-white" />
+                          <X className="w-3.5 h-3.5 text-text-primary" />
                         </button>
                       </div>
                     ) : (
-                      <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 border border-dashed border-gray-700 rounded-lg">
-                        <Image className="w-6 h-6 text-gray-600" />
-                        <p className="text-[10px] text-gray-600">No thumbnail yet</p>
+                      <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 border border-dashed border-border-light rounded-lg">
+                        <Image className="w-6 h-6 text-text-dim" />
+                        <p className="text-[10px] text-text-dim">No thumbnail yet</p>
                       </div>
                     )}
                     <button
                       onClick={onGenerateThumbnail}
                       disabled={isGenerating}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-xs font-medium text-gray-300 transition-colors flex items-center justify-center gap-1.5"
+                      className="w-full px-3 py-2 rounded-lg bg-surface-200 hover:bg-surface-300 disabled:opacity-50 text-xs font-medium text-text-secondary transition-colors flex items-center justify-center gap-1.5"
                     >
                       {isGenerating && generatingStatus.includes('thumbnail') ? (
                         <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generatingStatus}</>
@@ -2800,30 +2814,30 @@ function PostCard({
                   </div>
 
                   {/* Video Frame section */}
-                  <div className="bg-gray-800/20 rounded-xl p-3 space-y-2">
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Video Frame</p>
+                  <div className="bg-surface-200/20 rounded-xl p-3 space-y-2">
+                    <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Video Frame</p>
                     {day.generatedImageUrl ? (
                       <div className="relative cursor-pointer" onClick={() => onOpenLightbox(day.generatedImageUrl!)}>
-                        <img src={driveDisplayUrl(day.generatedImageUrl)} alt="Video frame" className="w-full aspect-video object-cover rounded-lg border border-gray-700" referrerPolicy="no-referrer" />
+                        <img src={driveDisplayUrl(day.generatedImageUrl)} alt="Video frame" className="w-full aspect-video object-cover rounded-lg border border-border-light" referrerPolicy="no-referrer" />
                         {day.styleOption && (
-                          <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-medium px-2 py-0.5 rounded-lg flex items-center gap-1">
+                          <span className="absolute bottom-2 right-2 bg-black/70 text-text-primary text-[10px] font-medium px-2 py-0.5 rounded-lg flex items-center gap-1">
                             <Camera className="w-3 h-3" /> {day.styleOption}
                           </span>
                         )}
                       </div>
                     ) : (
-                      <div className="w-full aspect-video flex flex-col items-center justify-center gap-3 bg-gray-800/20 border-2 border-dashed border-gray-700 rounded-lg px-4">
-                        <Video className="w-8 h-8 text-gray-600" />
-                        <p className="text-sm text-gray-600 text-center">{day.sceneDescription || 'No scene described yet'}</p>
+                      <div className="w-full aspect-video flex flex-col items-center justify-center gap-3 bg-surface-200/20 border-2 border-dashed border-border-light rounded-lg px-4">
+                        <Video className="w-8 h-8 text-text-dim" />
+                        <p className="text-sm text-text-dim text-center">{day.sceneDescription || 'No scene described yet'}</p>
                       </div>
                     )}
                     <div className="flex gap-2">
-                      <button onClick={onConfirmGenerate} disabled={isGenerating} className="flex-1 px-3 py-2 rounded-lg bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center justify-center gap-1.5">
+                      <button onClick={onConfirmGenerate} disabled={isGenerating} className="flex-1 px-3 py-2 rounded-lg bg-brand-500 hover:bg-brand-400 disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center justify-center gap-1.5">
                         {isGenerating && generatingStatus.includes('image') ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generatingStatus}</> : <><Image className="w-3.5 h-3.5" /> {day.generatedImageUrl ? 'Regen' : 'Generate'}</>}
                       </button>
                       <button
                         onClick={() => onOpenDrivePicker('single')}
-                        className="flex-1 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-300 transition-colors flex items-center justify-center gap-1.5"
+                        className="flex-1 px-3 py-2 rounded-lg bg-surface-200 hover:bg-surface-300 text-xs font-medium text-text-secondary transition-colors flex items-center justify-center gap-1.5"
                       >
                         <FolderOpen className="w-3.5 h-3.5" /> From Drive
                       </button>
@@ -2832,16 +2846,16 @@ function PostCard({
 
                   {/* Generate Video button */}
                   {day.generatedImageUrl && !day.generatedVideoUrl && (
-                    <button onClick={onGenerateVideo} disabled={isGenerating} className="w-full px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-sm font-medium text-gray-300 transition-colors flex items-center justify-center gap-2">
+                    <button onClick={onGenerateVideo} disabled={isGenerating} className="w-full px-4 py-2.5 rounded-xl bg-surface-200 hover:bg-surface-300 disabled:opacity-50 text-sm font-medium text-text-secondary transition-colors flex items-center justify-center gap-2">
                       <Video className="w-4 h-4" /> Generate Video
                     </button>
                   )}
 
                   {/* Video player */}
                   {day.generatedVideoUrl && (
-                    <div className="rounded-xl overflow-hidden border border-gray-700">
+                    <div className="rounded-xl overflow-hidden border border-border-light">
                       <video src={day.generatedVideoUrl} controls className="w-full" />
-                      <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">
+                      <div className="flex items-center gap-2 px-3 py-2 text-xs text-text-muted">
                         {videoStatus === 'submitted' || videoStatus === 'processing' ? (
                           <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {generatingStatus || 'Processing video...'}</>
                         ) : videoStatus === 'done' ? (
@@ -2855,7 +2869,7 @@ function PostCard({
 
                   {/* Video generation status */}
                   {!day.generatedVideoUrl && (videoStatus === 'submitted' || videoStatus === 'processing') && (
-                    <div className="flex items-center gap-2 text-sm text-gray-400 bg-gray-800/40 rounded-xl px-4 py-3">
+                    <div className="flex items-center gap-2 text-sm text-text-muted bg-surface-200/40 rounded-xl px-4 py-3">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       {generatingStatus || 'Processing video...'}
                     </div>
@@ -2864,35 +2878,35 @@ function PostCard({
               )}
 
               {/* Status & Actions (shared across all types) */}
-              <div className="bg-gray-800/30 rounded-xl p-4 space-y-3">
+              <div className="bg-surface-200/30 rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">Status</span>
+                  <span className="text-xs text-text-muted">Status</span>
                   <span className={cn('text-[10px] px-2.5 py-1 rounded-full font-semibold uppercase tracking-wide', STATUS_COLORS[day.status])}>
                     {day.status}
                   </span>
                 </div>
                 {isPublished ? (
                   <>
-                    <div className="flex items-center gap-2 text-sm text-rose-400 justify-center py-1">
+                    <div className="flex items-center gap-2 text-sm text-brand-400 justify-center py-1">
                       <Lock className="w-4 h-4" /> Published
                     </div>
-                    <button onClick={onDuplicate} className="w-full px-5 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-medium text-white transition-colors flex items-center justify-center gap-2">
+                    <button onClick={onDuplicate} className="w-full px-5 py-2.5 rounded-xl bg-surface-200 hover:bg-surface-300 text-sm font-medium text-text-primary transition-colors flex items-center justify-center gap-2">
                       <Copy className="w-4 h-4" /> Duplicate Post
                     </button>
                   </>
                 ) : (
                   <>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-300">Good to Post</span>
+                      <span className="text-sm text-text-secondary">Good to Post</span>
                       <button
                         onClick={() => onUpdateField('isGoodToPost', !day.isGoodToPost)}
-                        className={cn('relative inline-flex h-6 w-11 items-center rounded-full transition-colors', day.isGoodToPost ? 'bg-emerald-500' : 'bg-gray-600')}
+                        className={cn('relative inline-flex h-6 w-11 items-center rounded-full transition-colors', day.isGoodToPost ? 'bg-emerald-500' : 'bg-surface-300')}
                       >
                         <span className={cn('inline-block h-4 w-4 transform rounded-full bg-white transition-transform', day.isGoodToPost ? 'translate-x-6' : 'translate-x-1')} />
                       </button>
                     </div>
                     {day.status === 'completed' && day.isGoodToPost && (
-                      <button onClick={onPublish} disabled={isGenerating} className="w-full px-5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-sm font-semibold text-white transition-colors flex items-center justify-center gap-2">
+                      <button onClick={onPublish} disabled={isGenerating} className="w-full px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 disabled:opacity-50 text-sm font-semibold text-white transition-colors flex items-center justify-center gap-2">
                         {isGenerating && generatingStatus === 'Publishing...' ? <><Loader2 className="w-4 h-4 animate-spin" /> Publishing...</> : <><Send className="w-4 h-4" /> {publishLabel || 'Publish to Instagram'}</>}
                       </button>
                     )}
@@ -2911,11 +2925,11 @@ function PostCard({
           <div className={cn("flex-1 md:order-1 space-y-4 min-w-0", isPublished && "pointer-events-none opacity-80")}>
 
             {/* Section: Theme */}
-            <div className="bg-gray-800/30 rounded-xl p-4 space-y-3">
+            <div className="bg-surface-200/30 rounded-xl p-4 space-y-3">
               <InlineEdit
                 value={day.theme}
                 onSave={v => onUpdateField('theme', v)}
-                className="text-2xl font-bold text-white leading-tight"
+                className="text-2xl font-bold text-text-primary leading-tight"
                 placeholder="Post theme..."
               />
 
@@ -2928,8 +2942,8 @@ function PostCard({
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all',
                       day.contentType === t
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'
+                        ? 'bg-accent-600 text-white shadow-sm'
+                        : 'bg-surface-200 text-text-muted hover:text-text-primary hover:bg-surface-300'
                     )}
                   >
                     {contentTypeIcons[t as ContentType]}
@@ -2941,19 +2955,19 @@ function PostCard({
 
             {/* ---- PHOTO-specific content ---- */}
             {day.contentType === 'Photo' && (
-              <div className="bg-gray-800/30 rounded-xl p-4 space-y-2">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Scene</p>
+              <div className="bg-surface-200/30 rounded-xl p-4 space-y-2">
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Scene</p>
                 <InlineEdit
                   value={day.sceneDescription}
                   onSave={v => onUpdateField('sceneDescription', v)}
-                  className="text-sm text-gray-400 leading-relaxed"
+                  className="text-sm text-text-muted leading-relaxed"
                   placeholder="Describe the visual scene..."
                   multiline
                 />
-                <DetailRowIcon icon={<Type className="w-3.5 h-3.5 text-gray-400" />} label="On-Screen" value={day.onScreenText} onSave={v => onUpdateField('onScreenText', v)} multiline />
+                <DetailRowIcon icon={<Type className="w-3.5 h-3.5 text-text-muted" />} label="On-Screen" value={day.onScreenText} onSave={v => onUpdateField('onScreenText', v)} multiline />
                 {day.onScreenText && (
                   <div className="flex items-center gap-2 pl-6">
-                    <span className="text-[10px] text-gray-500 w-16 flex-shrink-0">Position</span>
+                    <span className="text-[10px] text-text-muted w-16 flex-shrink-0">Position</span>
                     <div className="flex gap-1">
                       {(['top', 'middle', 'bottom'] as const).map(pos => (
                         <button
@@ -2961,7 +2975,7 @@ function PostCard({
                           onClick={() => onUpdateField('textPosition', pos)}
                           className={cn(
                             'px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors capitalize',
-                            (day.textPosition || 'bottom') === pos ? 'bg-white text-gray-900' : 'bg-gray-800 text-gray-400 hover:text-white'
+                            (day.textPosition || 'bottom') === pos ? 'bg-accent-600 text-white' : 'bg-surface-200 text-text-muted hover:text-text-primary'
                           )}
                         >
                           {pos}
@@ -2975,15 +2989,15 @@ function PostCard({
 
             {/* ---- CAROUSEL-specific content ---- */}
             {day.contentType === 'Carousel' && (
-              <div className="bg-gray-800/30 rounded-xl p-4 space-y-3">
+              <div className="bg-surface-200/30 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Slides</p>
+                  <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Slides</p>
                   <button
                     onClick={() => {
                       const slides = [...(day.slides || []), { id: generateId(), sceneDescription: '', onScreenText: '', contentType: 'Photo' as const }];
                       onUpdateField('slides', slides);
                     }}
-                    className="text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1"
+                    className="text-xs text-text-muted hover:text-text-primary transition-colors flex items-center gap-1"
                   >
                     <Plus className="w-3 h-3" /> Add slide
                   </button>
@@ -2999,7 +3013,7 @@ function PostCard({
                       }));
                       onUpdateField('slides', slides);
                     }}
-                    className="w-full py-6 rounded-xl border-2 border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 transition-colors text-sm flex items-center justify-center gap-2"
+                    className="w-full py-6 rounded-xl border-2 border-dashed border-border-light text-text-muted hover:text-text-primary hover:border-border-light transition-colors text-sm flex items-center justify-center gap-2"
                   >
                     <LayoutGrid className="w-4 h-4" /> Generate carousel slides (4 slots)
                   </button>
@@ -3011,22 +3025,22 @@ function PostCard({
                         onClick={() => setSelectedSlideIdx(idx)}
                         className={cn(
                           'flex gap-3 p-3 rounded-xl border transition-all cursor-pointer',
-                          selectedSlideIdx === idx ? 'border-white/30 bg-gray-800/50' : 'border-gray-700/50 hover:border-gray-600'
+                          selectedSlideIdx === idx ? 'border-white/30 bg-surface-200/50' : 'border-border-light/50 hover:border-border-light'
                         )}
                       >
                         {/* Slide thumbnail or number badge */}
-                        <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-800 flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-surface-200 flex items-center justify-center">
                           {slide.generatedImageUrl ? (
                             <img src={slide.generatedImageUrl} alt="" className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-lg font-bold text-gray-600">{idx + 1}</span>
+                            <span className="text-lg font-bold text-text-dim">{idx + 1}</span>
                           )}
                         </div>
                         {/* Slide text fields */}
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-bold text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">S{idx + 1}</span>
-                            <span className="text-[10px] text-gray-600">Scene</span>
+                            <span className="text-[10px] font-bold text-text-muted bg-surface-200 px-1.5 py-0.5 rounded">S{idx + 1}</span>
+                            <span className="text-[10px] text-text-dim">Scene</span>
                           </div>
                           <InlineEdit
                             value={slide.sceneDescription}
@@ -3035,7 +3049,7 @@ function PostCard({
                               slides[idx] = { ...slides[idx], sceneDescription: v };
                               onUpdateField('slides', slides);
                             }}
-                            className="text-xs text-gray-300"
+                            className="text-xs text-text-secondary"
                             placeholder="Slide scene description..."
                           />
                           <InlineEdit
@@ -3045,7 +3059,7 @@ function PostCard({
                               slides[idx] = { ...slides[idx], onScreenText: v };
                               onUpdateField('slides', slides);
                             }}
-                            className="text-xs text-gray-400 italic"
+                            className="text-xs text-text-muted italic"
                             placeholder="Overlay text..."
                           />
                         </div>
@@ -3060,12 +3074,12 @@ function PostCard({
             {day.contentType === 'Video' && (
               <div className="space-y-4">
                 {/* Scene description */}
-                <div className="bg-gray-800/30 rounded-xl p-4 space-y-2">
-                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Scene</p>
+                <div className="bg-surface-200/30 rounded-xl p-4 space-y-2">
+                  <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Scene</p>
                   <InlineEdit
                     value={day.sceneDescription}
                     onSave={v => onUpdateField('sceneDescription', v)}
-                    className="text-sm text-gray-400 leading-relaxed"
+                    className="text-sm text-text-muted leading-relaxed"
                     placeholder="Describe the visual scene..."
                     multiline
                   />
@@ -3080,17 +3094,17 @@ function PostCard({
                   <InlineEdit
                     value={day.hook}
                     onSave={v => onUpdateField('hook', v)}
-                    className="text-base text-white font-medium leading-relaxed"
+                    className="text-base text-text-primary font-medium leading-relaxed"
                     placeholder="What grabs attention in the first 1-3 seconds?"
                     multiline
                   />
                 </div>
 
                 {/* Thumbnail Concept */}
-                <div className="bg-gray-800/30 rounded-xl p-4 space-y-2">
+                <div className="bg-surface-200/30 rounded-xl p-4 space-y-2">
                   <div className="flex items-center gap-2">
-                    <Image className="w-3.5 h-3.5 text-gray-400" />
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Thumbnail Concept</p>
+                    <Image className="w-3.5 h-3.5 text-text-muted" />
+                    <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Thumbnail Concept</p>
                   </div>
                   <InlineEdit
                     value={thumbnailConcept}
@@ -3099,17 +3113,17 @@ function PostCard({
                       const newNotes = v ? `[THUMBNAIL] ${v}\n${cleanNotes}` : cleanNotes;
                       onUpdateField('notes', newNotes);
                     }}
-                    className="text-sm text-gray-300"
+                    className="text-sm text-text-secondary"
                     placeholder="Describe what the thumbnail should look like..."
                     multiline
                   />
                 </div>
 
                 {/* Camera Angle selector */}
-                <div className="bg-gray-800/30 rounded-xl p-4 space-y-2">
+                <div className="bg-surface-200/30 rounded-xl p-4 space-y-2">
                   <div className="flex items-center gap-2">
-                    <Camera className="w-3.5 h-3.5 text-gray-400" />
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Camera Angle</p>
+                    <Camera className="w-3.5 h-3.5 text-text-muted" />
+                    <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Camera Angle</p>
                   </div>
                   <div className="flex gap-1.5 flex-wrap">
                     {VIDEO_CAMERA_ANGLES.map(angle => (
@@ -3119,8 +3133,8 @@ function PostCard({
                         className={cn(
                           'px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
                           day.styleOption === angle.value
-                            ? 'bg-white text-gray-900 shadow-sm'
-                            : 'bg-gray-700/50 text-gray-400 hover:text-gray-200 hover:bg-gray-700'
+                            ? 'bg-accent-600 text-white shadow-sm'
+                            : 'bg-surface-300/50 text-text-muted hover:text-text-primary hover:bg-surface-300'
                         )}
                       >
                         {angle.label}
@@ -3130,65 +3144,65 @@ function PostCard({
                 </div>
 
                 {/* Audio / Music — prominent for video */}
-                <div className="bg-gray-800/30 rounded-xl p-4">
+                <div className="bg-surface-200/30 rounded-xl p-4">
                   <DetailRowIcon icon={<Music className="w-3.5 h-3.5 text-purple-400" />} label="Audio" value={day.musicSuggestion} onSave={v => onUpdateField('musicSuggestion', v)} />
                 </div>
               </div>
             )}
 
             {/* Section: Caption & Copy (shared) */}
-            <div className="bg-gray-800/30 rounded-xl p-4 space-y-3">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Caption & Copy</p>
+            <div className="bg-surface-200/30 rounded-xl p-4 space-y-3">
+              <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Caption & Copy</p>
               <InlineEdit
                 value={day.caption}
                 onSave={v => onUpdateField('caption', v)}
-                className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap"
+                className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap"
                 placeholder="Write your caption..."
                 multiline
               />
               {day.contentType !== 'Video' && (
                 <div className="flex items-start gap-2">
                   <Zap className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                  <span className="text-xs text-gray-500 w-10 flex-shrink-0">Hook</span>
+                  <span className="text-xs text-text-muted w-10 flex-shrink-0">Hook</span>
                   <InlineEdit
                     value={day.hook}
                     onSave={v => onUpdateField('hook', v)}
-                    className="text-sm text-gray-300 italic flex-1"
+                    className="text-sm text-text-secondary italic flex-1"
                     placeholder="Attention-grabbing opening line..."
                   />
                 </div>
               )}
               <div className="flex items-start gap-2">
                 <MousePointerClick className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
-                <span className="text-xs text-gray-500 w-10 flex-shrink-0">CTA</span>
+                <span className="text-xs text-text-muted w-10 flex-shrink-0">CTA</span>
                 <InlineEdit
                   value={day.cta}
                   onSave={v => onUpdateField('cta', v)}
-                  className="text-sm text-gray-300 flex-1"
+                  className="text-sm text-text-secondary flex-1"
                   placeholder="Call to action..."
                 />
               </div>
               <div className="flex items-start gap-2">
-                <Hash className="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5" />
+                <Hash className="w-3.5 h-3.5 text-brand-400 flex-shrink-0 mt-0.5" />
                 <InlineEdit
                   value={day.hashtags}
                   onSave={v => onUpdateField('hashtags', v)}
-                  className="text-sm text-rose-400/80 flex-1"
+                  className="text-sm text-brand-400/80 flex-1"
                   placeholder="#hashtag #hashtag #hashtag"
                 />
               </div>
             </div>
 
             {/* Section: Details (shared) */}
-            <div className="bg-gray-800/30 rounded-xl p-4 space-y-2.5">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Details</p>
-              <DetailRowIcon icon={<MapPin className="w-3.5 h-3.5 text-gray-400" />} label="Location" value={day.location} onSave={v => onUpdateField('location', v)} />
+            <div className="bg-surface-200/30 rounded-xl p-4 space-y-2.5">
+              <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-1">Details</p>
+              <DetailRowIcon icon={<MapPin className="w-3.5 h-3.5 text-text-muted" />} label="Location" value={day.location} onSave={v => onUpdateField('location', v)} />
               {day.contentType !== 'Video' && (
-                <DetailRowIcon icon={<Music className="w-3.5 h-3.5 text-gray-400" />} label="Music" value={day.musicSuggestion} onSave={v => onUpdateField('musicSuggestion', v)} />
+                <DetailRowIcon icon={<Music className="w-3.5 h-3.5 text-text-muted" />} label="Music" value={day.musicSuggestion} onSave={v => onUpdateField('musicSuggestion', v)} />
               )}
               <div className="flex items-center gap-2">
-                <BookOpen className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                <span className="text-xs text-gray-500 w-20 flex-shrink-0">Story Arc</span>
+                <BookOpen className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                <span className="text-xs text-text-muted w-20 flex-shrink-0">Story Arc</span>
                 <div className="flex gap-1 flex-wrap">
                   {STORY_ARCS.map(arc => (
                     <button
@@ -3196,7 +3210,7 @@ function PostCard({
                       onClick={() => onUpdateField('storyArc', arc as StoryArc)}
                       className={cn(
                         'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
-                        day.storyArc === arc ? 'bg-white text-gray-900' : 'bg-gray-700/50 text-gray-500 hover:text-gray-300'
+                        day.storyArc === arc ? 'bg-accent-600 text-white' : 'bg-surface-300/50 text-text-muted hover:text-text-secondary'
                       )}
                     >
                       {arc}
@@ -3205,8 +3219,8 @@ function PostCard({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Palette className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                <span className="text-xs text-gray-500 w-20 flex-shrink-0">Tone</span>
+                <Palette className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                <span className="text-xs text-text-muted w-20 flex-shrink-0">Tone</span>
                 <div className="flex gap-1 flex-wrap">
                   {CAPTION_TONES.map(tone => (
                     <button
@@ -3214,7 +3228,7 @@ function PostCard({
                       onClick={() => onUpdateField('captionTone', tone as CaptionTone)}
                       className={cn(
                         'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
-                        day.captionTone === tone ? 'bg-white text-gray-900' : 'bg-gray-700/50 text-gray-500 hover:text-gray-300'
+                        day.captionTone === tone ? 'bg-accent-600 text-white' : 'bg-surface-300/50 text-text-muted hover:text-text-secondary'
                       )}
                     >
                       {tone}
@@ -3222,18 +3236,18 @@ function PostCard({
                   ))}
                 </div>
               </div>
-              <DetailRowIcon icon={<FileText className="w-3.5 h-3.5 text-gray-400" />} label="Notes" value={notesWithoutThumbnail} onSave={v => {
+              <DetailRowIcon icon={<FileText className="w-3.5 h-3.5 text-text-muted" />} label="Notes" value={notesWithoutThumbnail} onSave={v => {
                 const thumb = day.notes?.match(/\[THUMBNAIL\] .+?(?:\n|$)/)?.[0] || '';
                 onUpdateField('notes', thumb ? `${thumb}${v}` : v);
               }} multiline />
             </div>
 
             {/* Section: Production (shared) */}
-            <div className="bg-gray-800/30 rounded-xl p-4 space-y-2.5">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Production</p>
+            <div className="bg-surface-200/30 rounded-xl p-4 space-y-2.5">
+              <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-1">Production</p>
               <div className="flex items-center gap-2">
-                <Globe className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                <span className="text-xs text-gray-500 w-20 flex-shrink-0">Platforms</span>
+                <Globe className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                <span className="text-xs text-text-muted w-20 flex-shrink-0">Platforms</span>
                 <div className="flex gap-1">
                   {PLATFORMS.map(p => (
                     <button
@@ -3245,7 +3259,7 @@ function PostCard({
                       }}
                       className={cn(
                         'px-2.5 py-0.5 rounded-full text-[10px] font-semibold transition-colors',
-                        day.platforms.includes(p) ? 'bg-white text-gray-900' : 'bg-gray-700/50 text-gray-500 hover:text-gray-300'
+                        day.platforms.includes(p) ? 'bg-accent-600 text-white' : 'bg-surface-300/50 text-text-muted hover:text-text-secondary'
                       )}
                     >
                       {p}
@@ -3253,9 +3267,9 @@ function PostCard({
                   ))}
                 </div>
               </div>
-              <DetailRowIcon icon={<Scissors className="w-3.5 h-3.5 text-gray-400" />} label="Hairstyle" value={day.hairstyle || ''} onSave={v => onUpdateField('hairstyle', v)} />
+              <DetailRowIcon icon={<Scissors className="w-3.5 h-3.5 text-text-muted" />} label="Hairstyle" value={day.hairstyle || ''} onSave={v => onUpdateField('hairstyle', v)} />
               {day.contentType !== 'Video' && (
-                <DetailRowIcon icon={<Shirt className="w-3.5 h-3.5 text-gray-400" />} label="Style" value={day.styleOption || ''} onSave={v => onUpdateField('styleOption', v)} />
+                <DetailRowIcon icon={<Shirt className="w-3.5 h-3.5 text-text-muted" />} label="Style" value={day.styleOption || ''} onSave={v => onUpdateField('styleOption', v)} />
               )}
             </div>
 
@@ -3271,8 +3285,8 @@ function DetailRowIcon({ icon, label, value, onSave, multiline }: { icon: React.
   return (
     <div className="flex items-start gap-2">
       <span className="flex-shrink-0 mt-0.5">{icon}</span>
-      <span className="text-xs text-gray-500 w-20 flex-shrink-0">{label}</span>
-      <InlineEdit value={value} onSave={onSave} className="text-xs text-gray-300 flex-1" placeholder={`Add ${label.toLowerCase()}`} multiline={multiline} />
+      <span className="text-xs text-text-muted w-20 flex-shrink-0">{label}</span>
+      <InlineEdit value={value} onSave={onSave} className="text-xs text-text-secondary flex-1" placeholder={`Add ${label.toLowerCase()}`} multiline={multiline} />
     </div>
   );
 }
@@ -3359,11 +3373,11 @@ function CalendarGrid({
     <div className="flex-1 overflow-y-auto p-6">
       {/* Month nav */}
       <div className="flex items-center justify-between mb-6">
-        <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors">
+        <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-surface-200 text-text-muted hover:text-text-primary transition-colors">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <h2 className="text-lg font-semibold text-white">{monthName}</h2>
-        <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors">
+        <h2 className="text-lg font-semibold text-text-primary">{monthName}</h2>
+        <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-surface-200 text-text-muted hover:text-text-primary transition-colors">
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
@@ -3371,7 +3385,7 @@ function CalendarGrid({
       {/* Weekday headers */}
       <div className="grid grid-cols-7 gap-1 mb-1">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-          <div key={d} className="text-center text-xs text-gray-500 font-medium py-2">{d}</div>
+          <div key={d} className="text-center text-xs text-text-muted font-medium py-2">{d}</div>
         ))}
       </div>
 
@@ -3387,8 +3401,8 @@ function CalendarGrid({
               key={dateStr}
               className={cn(
                 'min-h-[100px] rounded-lg border p-2 transition-colors cursor-pointer',
-                dayPosts.length > 0 ? 'border-gray-700 hover:border-gray-500 bg-gray-900/50' : 'border-gray-800/50',
-                isDragOver && 'border-rose-500/50 bg-rose-500/5'
+                dayPosts.length > 0 ? 'border-border-light hover:border-border-light bg-surface-50/50' : 'border-border/50',
+                isDragOver && 'border-brand-500/50 bg-brand-500/5'
               )}
               onClick={() => dayPosts[0] && onSelectDay(dayPosts[0].id)}
               onDragOver={e => handleDragOver(e, dateStr)}
@@ -3397,7 +3411,7 @@ function CalendarGrid({
             >
               <span className={cn(
                 'text-xs font-medium',
-                dayPosts.length > 0 ? 'text-white' : 'text-gray-600'
+                dayPosts.length > 0 ? 'text-text-primary' : 'text-text-dim'
               )}>
                 {dayNum}
               </span>
@@ -3414,8 +3428,8 @@ function CalendarGrid({
                   >
                     {/* Lock badge for published posts */}
                     {isPublished && (
-                      <div className="absolute top-0.5 right-0.5 z-10 w-4 h-4 rounded-full bg-rose-500/80 flex items-center justify-center">
-                        <Lock className="w-2.5 h-2.5 text-white" />
+                      <div className="absolute top-0.5 right-0.5 z-10 w-4 h-4 rounded-full bg-brand-500/80 flex items-center justify-center">
+                        <Lock className="w-2.5 h-2.5 text-text-primary" />
                       </div>
                     )}
                     {/* Duplicate button for published posts */}
@@ -3423,9 +3437,9 @@ function CalendarGrid({
                       <button
                         onClick={e => { e.stopPropagation(); onDuplicateDay(post.id); }}
                         title="Duplicate post"
-                        className="absolute bottom-0.5 right-0.5 z-10 w-5 h-5 rounded bg-gray-800/90 flex items-center justify-center opacity-0 group-hover/calpost:opacity-100 transition-opacity"
+                        className="absolute bottom-0.5 right-0.5 z-10 w-5 h-5 rounded bg-surface-200/90 flex items-center justify-center opacity-0 group-hover/calpost:opacity-100 transition-opacity"
                       >
-                        <Copy className="w-3 h-3 text-gray-300" />
+                        <Copy className="w-3 h-3 text-text-secondary" />
                       </button>
                     )}
                     {post.generatedImageUrl ? (
@@ -3591,7 +3605,7 @@ function PersonaEditorPanel({
     <div className="max-w-5xl mx-auto p-4 md:p-6">
       {/* Top bar */}
       <div className="flex items-center justify-between mb-4">
-        <span className="text-xs uppercase tracking-widest text-gray-500 font-semibold">Persona Card</span>
+        <span className="text-xs uppercase tracking-widest text-text-muted font-semibold">Persona Card</span>
         <div className="flex items-center gap-1">
           {onTogglePin && (
             <button
@@ -3600,14 +3614,14 @@ function PersonaEditorPanel({
               className={cn(
                 'p-2 rounded-lg transition-colors',
                 isPinned
-                  ? 'bg-violet-500/20 text-violet-400 hover:bg-violet-500/30'
-                  : 'hover:bg-gray-800 text-gray-400 hover:text-white'
+                  ? 'bg-accent-500/20 text-accent-400 hover:bg-accent-500/30'
+                  : 'hover:bg-surface-200 text-text-muted hover:text-text-primary'
               )}
             >
               {isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
             </button>
           )}
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-200 text-text-muted hover:text-text-primary transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -3615,22 +3629,22 @@ function PersonaEditorPanel({
 
       {/* AI Prompt Bar — only show when persona is empty/new */}
       {(!persona.identity.fullName || persona.identity.fullName === 'New Persona') && (
-        <div className="bg-gradient-to-r from-rose-500/10 to-orange-500/5 border border-rose-500/20 rounded-2xl p-4 mb-4">
+        <div className="bg-gradient-to-r from-brand-500/10 to-orange-500/5 border border-brand-500/20 rounded-2xl p-4 mb-4">
           <div className="flex gap-2 items-center">
-            <Sparkles className="w-5 h-5 text-rose-400 flex-shrink-0" />
+            <Sparkles className="w-5 h-5 text-brand-400 flex-shrink-0" />
             <input
               type="text"
               value={aiDescription}
               onChange={e => onAiDescriptionChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && aiDescription.trim() && onGenerateAIPersona()}
-              className="flex-1 bg-transparent text-white placeholder:text-gray-400 text-sm outline-none"
+              className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted text-sm outline-none"
               placeholder='Describe your persona: "24yo Italian lifestyle influencer who loves travel and fashion"'
               disabled={isAIGenerating}
             />
             <button
               onClick={onGenerateAIPersona}
               disabled={!aiDescription.trim() || isAIGenerating}
-              className="px-4 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:opacity-40 text-xs font-semibold text-white flex items-center gap-1.5"
+              className="px-4 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-400 disabled:opacity-40 text-xs font-semibold text-white flex items-center gap-1.5"
             >
               {isAIGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
               {isAIGenerating ? 'Building...' : 'Generate'}
@@ -3648,8 +3662,8 @@ function PersonaEditorPanel({
             className={cn(
               'flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
               tab === t.key
-                ? 'bg-white text-gray-900'
-                : 'bg-gray-800 text-gray-400 hover:text-white'
+                ? 'bg-accent-600 text-white'
+                : 'bg-surface-200 text-text-muted hover:text-text-primary'
             )}
           >
             {t.icon}
@@ -3660,19 +3674,19 @@ function PersonaEditorPanel({
 
       {/* ======================== PROFILE TAB ======================== */}
       {tab === 'profile' && (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="bg-surface-50 border border-border rounded-2xl overflow-hidden">
           {/* Header Band */}
-          <div className="bg-gray-900 px-6 py-4">
+          <div className="bg-surface-50 px-6 py-4">
             <InlineEdit
               value={p.identity.fullName}
               onSave={v => onUpdateField('identity.fullName', v)}
-              className="text-3xl font-black text-white tracking-tight"
+              className="text-3xl font-black text-text-primary tracking-tight"
               placeholder="Persona Name"
             />
             <InlineEdit
               value={p.identity.profession}
               onSave={v => onUpdateField('identity.profession', v)}
-              className="text-sm text-white/80 mt-1"
+              className="text-sm text-text-primary/80 mt-1"
               placeholder="Profession / Role"
             />
           </div>
@@ -3680,7 +3694,7 @@ function PersonaEditorPanel({
           {/* Main Grid: 3 columns on desktop */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
             {/* LEFT COLUMN: Photo + Stats */}
-            <div className="p-5 border-r border-gray-800 space-y-5">
+            <div className="p-5 border-r border-border space-y-5">
               {/* Reference Images */}
               <div>
                 <div className="flex flex-wrap gap-2">
@@ -3690,50 +3704,50 @@ function PersonaEditorPanel({
                         src={url} alt=""
                         className={cn(
                           'w-20 h-20 rounded-xl object-cover border-2 cursor-pointer transition-all',
-                          url === p.referenceImageUrl ? 'border-white' : 'border-gray-700 hover:border-gray-500'
+                          url === p.referenceImageUrl ? 'border-white' : 'border-border-light hover:border-border-light'
                         )}
                         onClick={() => onUpdateField('referenceImageUrl', url)}
                       />
                       <button onClick={() => removeRefImage(i)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <X className="w-3 h-3 text-white" />
+                        <X className="w-3 h-3 text-text-primary" />
                       </button>
                     </div>
                   ))}
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-700 hover:border-gray-500 flex items-center justify-center text-gray-500 hover:text-gray-300 transition-colors"
+                    className="w-20 h-20 rounded-xl border-2 border-dashed border-border-light hover:border-border-light flex items-center justify-center text-text-muted hover:text-text-secondary transition-colors"
                   >
                     <Plus className="w-6 h-6" />
                   </button>
                   <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 </div>
-                <p className="text-[10px] text-gray-500 mt-2">Click image to set as primary. These train AI consistency.</p>
+                <p className="text-[10px] text-text-muted mt-2">Click image to set as primary. These train AI consistency.</p>
               </div>
 
               {/* Thumbnail Style References */}
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Thumbnail Style References</p>
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Thumbnail Style References</p>
                 <div className="flex flex-wrap gap-2">
                   {(p.thumbnailReferenceUrls || []).map((url, i) => (
                     <div key={i} className="relative group">
                       <img
                         src={url} alt=""
-                        className="w-16 h-16 rounded-lg object-cover border-2 border-gray-700 hover:border-gray-500 transition-all"
+                        className="w-16 h-16 rounded-lg object-cover border-2 border-border-light hover:border-border-light transition-all"
                       />
                       <button onClick={() => removeThumbnailRefImage(i)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <X className="w-3 h-3 text-white" />
+                        <X className="w-3 h-3 text-text-primary" />
                       </button>
                     </div>
                   ))}
                   <button
                     onClick={() => thumbnailFileRef.current?.click()}
-                    className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-700 hover:border-gray-500 flex items-center justify-center text-gray-500 hover:text-gray-300 transition-colors"
+                    className="w-16 h-16 rounded-lg border-2 border-dashed border-border-light hover:border-border-light flex items-center justify-center text-text-muted hover:text-text-secondary transition-colors"
                   >
                     <Plus className="w-5 h-5" />
                   </button>
                   <input ref={thumbnailFileRef} type="file" accept="image/*" onChange={handleThumbnailRefUpload} className="hidden" />
                 </div>
-                <p className="text-[10px] text-gray-500 mt-1.5">Upload examples of thumbnail styles for this persona's videos</p>
+                <p className="text-[10px] text-text-muted mt-1.5">Upload examples of thumbnail styles for this persona's videos</p>
               </div>
 
               {/* Quick Stats */}
@@ -3751,13 +3765,13 @@ function PersonaEditorPanel({
 
               {/* Locations */}
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Locations</p>
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Locations</p>
                 <TagList items={p.identity.locations} onUpdate={v => onUpdateField('identity.locations', v)} accent="gray" />
               </div>
 
               {/* Social Handles */}
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><AtSign className="w-3.5 h-3.5" /> Social Handles</p>
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5"><AtSign className="w-3.5 h-3.5" /> Social Handles</p>
                 <div className="space-y-2">
                   <StatRow label="Instagram" value={p.socialHandles?.instagram || ''} onSave={v => onUpdateField('socialHandles.instagram', v)} />
                   <StatRow label="TikTok" value={p.socialHandles?.tiktok || ''} onSave={v => onUpdateField('socialHandles.tiktok', v)} />
@@ -3768,32 +3782,32 @@ function PersonaEditorPanel({
 
               {/* Distinct Features */}
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Distinct Features</p>
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Distinct Features</p>
                 <TagList items={p.appearance.distinctFeatures} onUpdate={v => onUpdateField('appearance.distinctFeatures', v)} accent="amber" />
               </div>
             </div>
 
             {/* MIDDLE COLUMN: Bio + Fashion + Lifestyle */}
-            <div className="p-5 border-r border-gray-800 space-y-5">
+            <div className="p-5 border-r border-border space-y-5">
               {/* Bio / Backstory */}
-              <div className="bg-gray-800/50 rounded-xl p-4">
-                <p className="text-xs font-semibold text-gray-400 mb-2">Bio</p>
+              <div className="bg-surface-200/50 rounded-xl p-4">
+                <p className="text-xs font-semibold text-text-muted mb-2">Bio</p>
                 <InlineEdit
                   value={p.backstory}
                   onSave={v => onUpdateField('backstory', v)}
-                  className="text-sm text-gray-300 leading-relaxed"
+                  className="text-sm text-text-secondary leading-relaxed"
                   placeholder="Tell the persona's story..."
                   multiline
                 />
               </div>
 
               {/* Mission */}
-              <div className="bg-gray-800/50 rounded-xl p-4">
-                <p className="text-xs font-semibold text-gray-400 mb-2">Mission</p>
+              <div className="bg-surface-200/50 rounded-xl p-4">
+                <p className="text-xs font-semibold text-text-muted mb-2">Mission</p>
                 <InlineEdit
                   value={p.psychographic.mission}
                   onSave={v => onUpdateField('psychographic.mission', v)}
-                  className="text-sm text-gray-300 italic leading-relaxed"
+                  className="text-sm text-text-secondary italic leading-relaxed"
                   placeholder="What drives this persona?"
                   multiline
                 />
@@ -3801,18 +3815,18 @@ function PersonaEditorPanel({
 
               {/* Fashion */}
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Fashion & Style</p>
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Fashion & Style</p>
                 <div className="space-y-2">
                   <StatRow label="Aesthetic" value={p.fashionStyle.aesthetic} onSave={v => onUpdateField('fashionStyle.aesthetic', v)} />
                   <StatRow label="Photo Style" value={p.fashionStyle.photographyStyle} onSave={v => onUpdateField('fashionStyle.photographyStyle', v)} />
                 </div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mt-3 mb-2">Signature Items</p>
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mt-3 mb-2">Signature Items</p>
                 <TagList items={p.fashionStyle.signatureItems} onUpdate={v => onUpdateField('fashionStyle.signatureItems', v)} accent="rose" />
               </div>
 
               {/* Lifestyle */}
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Lifestyle</p>
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Lifestyle</p>
                 <div className="space-y-2">
                   <StatRow label="Routine" value={p.lifestyle.routine} onSave={v => onUpdateField('lifestyle.routine', v)} />
                   <StatRow label="Diet" value={p.lifestyle.diet} onSave={v => onUpdateField('lifestyle.diet', v)} />
@@ -3826,53 +3840,53 @@ function PersonaEditorPanel({
             <div className="p-5 space-y-5">
               {/* Core Traits */}
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Core Traits</p>
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Core Traits</p>
                 <TagList items={p.psychographic.coreTraits} onUpdate={v => onUpdateField('psychographic.coreTraits', v)} accent="emerald" />
               </div>
 
               {/* Interests */}
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Interests</p>
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Interests</p>
                 <TagList items={p.psychographic.interests} onUpdate={v => onUpdateField('psychographic.interests', v)} accent="sky" />
               </div>
 
               {/* Values */}
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Values</p>
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Values</p>
                 <TagList items={p.psychographic.values} onUpdate={v => onUpdateField('psychographic.values', v)} accent="gray" />
               </div>
 
               {/* Motivations */}
               <div>
-                <p className="text-xs font-semibold text-gray-400 mb-2">Motivations</p>
+                <p className="text-xs font-semibold text-text-muted mb-2">Motivations</p>
                 <ul className="space-y-1">
                   {p.psychographic.motivations.map((m, i) => (
-                    <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                    <li key={i} className="text-sm text-text-secondary flex items-start gap-2">
                       <span className="text-emerald-400 mt-0.5">+</span>
-                      <InlineEdit value={m} onSave={v => { const a = [...p.psychographic.motivations]; a[i] = v; onUpdateField('psychographic.motivations', a); }} className="text-sm text-gray-300" />
+                      <InlineEdit value={m} onSave={v => { const a = [...p.psychographic.motivations]; a[i] = v; onUpdateField('psychographic.motivations', a); }} className="text-sm text-text-secondary" />
                     </li>
                   ))}
-                  <button onClick={() => onUpdateField('psychographic.motivations', [...p.psychographic.motivations, ''])} className="text-xs text-gray-300 hover:text-white mt-1">+ Add motivation</button>
+                  <button onClick={() => onUpdateField('psychographic.motivations', [...p.psychographic.motivations, ''])} className="text-xs text-text-secondary hover:text-text-primary mt-1">+ Add motivation</button>
                 </ul>
               </div>
 
               {/* Fears */}
               <div>
-                <p className="text-xs font-semibold text-gray-400 mb-2">Fears</p>
+                <p className="text-xs font-semibold text-text-muted mb-2">Fears</p>
                 <ul className="space-y-1">
                   {p.psychographic.fears.map((f, i) => (
-                    <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                    <li key={i} className="text-sm text-text-secondary flex items-start gap-2">
                       <span className="text-red-400 mt-0.5">-</span>
-                      <InlineEdit value={f} onSave={v => { const a = [...p.psychographic.fears]; a[i] = v; onUpdateField('psychographic.fears', a); }} className="text-sm text-gray-300" />
+                      <InlineEdit value={f} onSave={v => { const a = [...p.psychographic.fears]; a[i] = v; onUpdateField('psychographic.fears', a); }} className="text-sm text-text-secondary" />
                     </li>
                   ))}
-                  <button onClick={() => onUpdateField('psychographic.fears', [...p.psychographic.fears, ''])} className="text-xs text-gray-300 hover:text-white mt-1">+ Add fear</button>
+                  <button onClick={() => onUpdateField('psychographic.fears', [...p.psychographic.fears, ''])} className="text-xs text-text-secondary hover:text-text-primary mt-1">+ Add fear</button>
                 </ul>
               </div>
 
               {/* AI Analysis (collapsed by default) */}
               <details className="group">
-                <summary className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-400">AI Consistency Rules</summary>
+                <summary className="text-[10px] font-semibold text-text-muted uppercase tracking-wider cursor-pointer hover:text-text-muted">AI Consistency Rules</summary>
                 <textarea
                   value={p.aiAnalysis ?? ''}
                   onChange={e => onUpdateField('aiAnalysis', e.target.value)}
@@ -3889,8 +3903,8 @@ function PersonaEditorPanel({
       {tab === 'friends' && (() => {
         const friends = p.friends || [];
         return (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden p-6">
-            <p className="text-xs text-gray-500 mb-5">
+          <div className="bg-surface-50 border border-border rounded-2xl overflow-hidden p-6">
+            <p className="text-xs text-text-muted mb-5">
               Friends appear as recurring characters in your content. Deactivate friends that have left the storyline.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3898,18 +3912,18 @@ function PersonaEditorPanel({
                 const isActive = (friend as any).active !== false;
                 return (
                   <div key={friend.id} className={cn(
-                    'bg-gray-800/50 rounded-2xl p-4 flex gap-4 items-start relative group transition-opacity',
+                    'bg-surface-200/50 rounded-2xl p-4 flex gap-4 items-start relative group transition-opacity',
                     !isActive && 'opacity-50'
                   )}>
                     {/* Friend Photo (64x64) */}
                     <div
-                      className="w-16 h-16 rounded-full bg-gray-700 flex-shrink-0 overflow-hidden cursor-pointer border-2 border-gray-600 hover:border-gray-400 transition-colors flex items-center justify-center"
+                      className="w-16 h-16 rounded-full bg-surface-300 flex-shrink-0 overflow-hidden cursor-pointer border-2 border-border-light hover:border-border transition-colors flex items-center justify-center"
                       onClick={() => friendFileRefs.current[idx]?.click()}
                     >
                       {friend.imageUrl ? (
                         <img src={friend.imageUrl} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <UserCircle className="w-8 h-8 text-gray-500" />
+                        <UserCircle className="w-8 h-8 text-text-muted" />
                       )}
                     </div>
                     <input
@@ -3924,13 +3938,13 @@ function PersonaEditorPanel({
                       <InlineEdit
                         value={friend.name}
                         onSave={v => { const a = [...friends]; a[idx] = { ...a[idx], name: v }; onUpdateField('friends', a); }}
-                        className="text-base font-semibold text-white"
+                        className="text-base font-semibold text-text-primary"
                         placeholder="Friend name"
                       />
                       <InlineEdit
                         value={friend.relationship || ''}
                         onSave={v => { const a = [...friends]; a[idx] = { ...a[idx], relationship: v }; onUpdateField('friends', a); }}
-                        className="text-xs text-rose-400"
+                        className="text-xs text-brand-400"
                         placeholder="Relationship (e.g., Best friend, Gym buddy)"
                       />
                       <TagList
@@ -3941,7 +3955,7 @@ function PersonaEditorPanel({
                       <InlineEdit
                         value={friend.profession || ''}
                         onSave={v => { const a = [...friends]; a[idx] = { ...a[idx], profession: v }; onUpdateField('friends', a); }}
-                        className="text-xs text-gray-400"
+                        className="text-xs text-text-muted"
                         placeholder="Profession"
                       />
                     </div>
@@ -3954,13 +3968,13 @@ function PersonaEditorPanel({
                           onUpdateField('friends', a);
                         }}
                         title={isActive ? 'Deactivate' : 'Activate'}
-                        className="text-gray-400 hover:text-white transition-colors"
+                        className="text-text-muted hover:text-text-primary transition-colors"
                       >
                         {isActive ? <ToggleRight className="w-5 h-5 text-emerald-400" /> : <ToggleLeft className="w-5 h-5" />}
                       </button>
                       <button
                         onClick={() => onShowConfirm({ title: 'Remove Friend', message: `Remove ${f.name || 'this friend'}?`, confirmLabel: 'Remove', confirmVariant: 'danger', onConfirm: () => onUpdateField('friends', friends.filter((_, i) => i !== idx)) })}
-                        className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="text-text-dim hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -3975,13 +3989,13 @@ function PersonaEditorPanel({
                   const newFriend: PersonaFriend = { id: generateId(), name: '', traits: [], profession: '' };
                   onUpdateField('friends', [...friends, newFriend]);
                 }}
-                className="mt-4 flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+                className="mt-4 flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary transition-colors"
               >
                 <Plus className="w-4 h-4" /> Add Friend
               </button>
             )}
             {friends.length === 0 && (
-              <p className="text-sm text-gray-600 italic mt-2">No friends added yet.</p>
+              <p className="text-sm text-text-dim italic mt-2">No friends added yet.</p>
             )}
           </div>
         );
@@ -3989,14 +4003,14 @@ function PersonaEditorPanel({
 
       {/* ======================== TARGET AUDIENCE TAB ======================== */}
       {tab === 'audience' && (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden p-6">
-          <p className="text-xs text-gray-500 mb-5">
+        <div className="bg-surface-50 border border-border rounded-2xl overflow-hidden p-6">
+          <p className="text-xs text-text-muted mb-5">
             Active audiences are available when creating new posts. Deactivate segments you've outgrown.
           </p>
 
           {/* Header with Generate AI button */}
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-semibold text-white flex items-center gap-1.5"><Users className="w-4 h-4" /> Audience Segments</p>
+            <p className="text-sm font-semibold text-text-primary flex items-center gap-1.5"><Users className="w-4 h-4" /> Audience Segments</p>
             <button
               onClick={async () => {
                 if ((p.targetAudiences || []).length >= 6) return;
@@ -4034,7 +4048,7 @@ Return a JSON array of 3 segments.`;
                   onUpdateField('targetAudiences', audiences);
                 } catch (err) { console.error('AI audience generation failed:', err); }
               }}
-              className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-rose-500/10 transition-colors"
+              className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-brand-500/10 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5" /> Generate with AI
             </button>
@@ -4046,7 +4060,7 @@ Return a JSON array of 3 segments.`;
               const isActive = (aud as any).active !== false;
               return (
                 <div key={aud.id} className={cn(
-                  'bg-gray-800/50 rounded-2xl p-4 relative group transition-opacity',
+                  'bg-surface-200/50 rounded-2xl p-4 relative group transition-opacity',
                   !isActive && 'opacity-50'
                 )}>
                   {/* Top row: name + toggle + delete */}
@@ -4054,7 +4068,7 @@ Return a JSON array of 3 segments.`;
                     <InlineEdit
                       value={aud.segmentName}
                       onSave={v => { const a = [...(p.targetAudiences || [])]; a[idx] = { ...a[idx], segmentName: v }; onUpdateField('targetAudiences', a); }}
-                      className="text-base font-semibold text-white"
+                      className="text-base font-semibold text-text-primary"
                       placeholder="Segment name"
                     />
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -4065,7 +4079,7 @@ Return a JSON array of 3 segments.`;
                           onUpdateField('targetAudiences', a);
                         }}
                         title={isActive ? 'Deactivate' : 'Activate'}
-                        className="text-gray-400 hover:text-white transition-colors"
+                        className="text-text-muted hover:text-text-primary transition-colors"
                       >
                         {isActive ? <ToggleRight className="w-5 h-5 text-emerald-400" /> : <ToggleLeft className="w-5 h-5" />}
                       </button>
@@ -4080,7 +4094,7 @@ Return a JSON array of 3 segments.`;
                             onUpdateField('targetAudiences', updated);
                           },
                         })}
-                        className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="text-text-dim hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -4092,21 +4106,21 @@ Return a JSON array of 3 segments.`;
                     <InlineEdit
                       value={aud.ageRange}
                       onSave={v => { const a = [...(p.targetAudiences || [])]; a[idx] = { ...a[idx], ageRange: v }; onUpdateField('targetAudiences', a); }}
-                      className="text-xs text-gray-400"
+                      className="text-xs text-text-muted"
                       placeholder="Age range"
                     />
-                    <span className="text-gray-600 text-xs">/</span>
+                    <span className="text-text-dim text-xs">/</span>
                     <InlineEdit
                       value={aud.genderSkew}
                       onSave={v => { const a = [...(p.targetAudiences || [])]; a[idx] = { ...a[idx], genderSkew: v }; onUpdateField('targetAudiences', a); }}
-                      className="text-xs text-gray-400"
+                      className="text-xs text-text-muted"
                       placeholder="Gender skew"
                     />
                   </div>
 
                   {/* Locations */}
                   <div className="mb-2">
-                    <p className="text-[10px] text-gray-500 mb-1">Locations</p>
+                    <p className="text-[10px] text-text-muted mb-1">Locations</p>
                     <TagList
                       items={aud.locations || []}
                       onUpdate={v => { const a = [...(p.targetAudiences || [])]; a[idx] = { ...a[idx], locations: v }; onUpdateField('targetAudiences', a); }}
@@ -4116,18 +4130,18 @@ Return a JSON array of 3 segments.`;
 
                   {/* Core Aspiration */}
                   <div className="mb-2">
-                    <p className="text-[10px] text-gray-500 mb-1">Core Aspiration</p>
+                    <p className="text-[10px] text-text-muted mb-1">Core Aspiration</p>
                     <InlineEdit
                       value={aud.coreAspiration}
                       onSave={v => { const a = [...(p.targetAudiences || [])]; a[idx] = { ...a[idx], coreAspiration: v }; onUpdateField('targetAudiences', a); }}
-                      className="text-sm text-white font-medium"
+                      className="text-sm text-text-primary font-medium"
                       placeholder="What does this audience aspire to?"
                     />
                   </div>
 
                   {/* Pain Points */}
                   <div className="mb-2">
-                    <p className="text-[10px] text-gray-500 mb-1">Pain Points</p>
+                    <p className="text-[10px] text-text-muted mb-1">Pain Points</p>
                     <TagList
                       items={aud.painPoints || []}
                       onUpdate={v => { const a = [...(p.targetAudiences || [])]; a[idx] = { ...a[idx], painPoints: v }; onUpdateField('targetAudiences', a); }}
@@ -4137,11 +4151,11 @@ Return a JSON array of 3 segments.`;
 
                   {/* Content Resonance Notes */}
                   <div>
-                    <p className="text-[10px] text-gray-500 mb-1">Content Resonance</p>
+                    <p className="text-[10px] text-text-muted mb-1">Content Resonance</p>
                     <InlineEdit
                       value={aud.contentResonanceNotes}
                       onSave={v => { const a = [...(p.targetAudiences || [])]; a[idx] = { ...a[idx], contentResonanceNotes: v }; onUpdateField('targetAudiences', a); }}
-                      className="text-xs text-gray-300"
+                      className="text-xs text-text-secondary"
                       placeholder="How content should speak to this audience"
                       multiline
                     />
@@ -4167,15 +4181,15 @@ Return a JSON array of 3 segments.`;
                 };
                 onUpdateField('targetAudiences', [...(p.targetAudiences || []), newAud]);
               }}
-              className="mt-4 flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+              className="mt-4 flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary transition-colors"
             >
               <Plus className="w-4 h-4" /> Add Segment
             </button>
           )}
 
           {/* Content Themes */}
-          <div className="mt-8 pt-6 border-t border-gray-800">
-            <p className="text-sm font-semibold text-white mb-3 flex items-center gap-1.5"><Target className="w-4 h-4" /> Content Themes</p>
+          <div className="mt-8 pt-6 border-t border-border">
+            <p className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-1.5"><Target className="w-4 h-4" /> Content Themes</p>
             <TagList
               items={p.contentThemes || []}
               onUpdate={v => onUpdateField('contentThemes', v)}
@@ -4190,7 +4204,7 @@ Return a JSON array of 3 segments.`;
                   ])].slice(0, 6);
                   onUpdateField('contentThemes', suggestions);
                 }}
-                className="text-xs text-gray-500 hover:text-gray-300 mt-2"
+                className="text-xs text-text-muted hover:text-text-secondary mt-2"
               >
                 + Add defaults from interests
               </button>
@@ -4201,8 +4215,8 @@ Return a JSON array of 3 segments.`;
 
       {/* ======================== SETTINGS TAB ======================== */}
       {tab === 'settings' && (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden p-6 space-y-6">
-          <p className="text-xs text-gray-500 mb-2">Per-persona configuration for this persona's publishing and media library.</p>
+        <div className="bg-surface-50 border border-border rounded-2xl overflow-hidden p-6 space-y-6">
+          <p className="text-xs text-text-muted mb-2">Per-persona configuration for this persona's publishing and media library.</p>
           <Section title="Google Drive">
             <Field label="Drive Folder URL">
               <div className="flex gap-2">
@@ -4216,14 +4230,14 @@ Return a JSON array of 3 segments.`;
                 <button
                   onClick={onSyncDrive}
                   disabled={driveLoading || !(p.driveFolderUrl || globalDriveFolderUrl)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-xs font-medium text-gray-300 transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-200 hover:bg-surface-300 disabled:opacity-40 text-xs font-medium text-text-secondary transition-colors whitespace-nowrap"
                 >
                   {driveLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                   Sync Now
                 </button>
               </div>
             </Field>
-            <p className="text-[10px] text-gray-500 mt-1.5 px-1">Connect a shared Google Drive folder for this persona's media library</p>
+            <p className="text-[10px] text-text-muted mt-1.5 px-1">Connect a shared Google Drive folder for this persona's media library</p>
           </Section>
 
           <Section title="Posting Schedule">
@@ -4285,9 +4299,9 @@ Return a JSON array of 3 segments.`;
               });
               return (
                 <div className="flex items-center gap-2 mt-3 px-1">
-                  <Clock className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                  <p className="text-xs text-gray-400">
-                    <span className="text-gray-500 font-medium">Scheduled slots:</span>{' '}
+                  <Clock className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                  <p className="text-xs text-text-muted">
+                    <span className="text-text-muted font-medium">Scheduled slots:</span>{' '}
                     {slots.join(' \u00b7 ')}
                   </p>
                 </div>
@@ -4314,7 +4328,7 @@ Return a JSON array of 3 segments.`;
                 placeholder="Page ID"
               />
             </Field>
-            <p className="text-[10px] text-gray-500 mt-2 px-1">Find your Instagram Account ID in Meta Business Suite. Required for direct Meta Graph API publishing.</p>
+            <p className="text-[10px] text-text-muted mt-2 px-1">Find your Instagram Account ID in Meta Business Suite. Required for direct Meta Graph API publishing.</p>
             <TestMetaConnectionButton
               instagramAccountId={p.instagramAccountId}
               metaAccessToken={globalMetaAccessToken}
@@ -4332,7 +4346,7 @@ Return a JSON array of 3 segments.`;
             </h3>
           </div>
           <div className="px-5 py-4 space-y-3">
-            <p className="text-xs text-gray-400 leading-relaxed">
+            <p className="text-xs text-text-muted leading-relaxed">
               Deleting this persona will permanently remove all associated content posts, generated images, videos, target audiences, and friends. This action cannot be undone and regeneration will cost additional credits.
             </p>
             <button
@@ -4366,24 +4380,24 @@ function InlineEdit({ value, onSave, className = '', placeholder = '', multiline
   if (!editing) {
     return (
       <div onClick={() => setEditing(true)} className={cn(className, 'cursor-text hover:bg-white/5 rounded px-1 -mx-1 transition-colors min-h-[1.2em]')}>
-        {value || <span className="text-gray-600">{placeholder}</span>}
+        {value || <span className="text-text-dim">{placeholder}</span>}
       </div>
     );
   }
 
   if (multiline) {
-    return <textarea ref={ref as any} value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Escape') { setDraft(value); setEditing(false); } }} className={cn(className, 'bg-gray-800 rounded px-1 -mx-1 outline-none ring-1 ring-gray-400 w-full resize-y min-h-[60px]')} />;
+    return <textarea ref={ref as any} value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Escape') { setDraft(value); setEditing(false); } }} className={cn(className, 'bg-surface-200 rounded px-1 -mx-1 outline-none ring-1 ring-gray-400 w-full resize-y min-h-[60px]')} />;
   }
 
-  return <input ref={ref as any} value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }} className={cn(className, 'bg-gray-800 rounded px-1 -mx-1 outline-none ring-1 ring-gray-400 w-full')} />;
+  return <input ref={ref as any} value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }} className={cn(className, 'bg-surface-200 rounded px-1 -mx-1 outline-none ring-1 ring-gray-400 w-full')} />;
 }
 
 // --- Stat row: label : value, click value to edit ---
 function StatRow({ label, value, onSave }: { label: string; value: string; onSave: (v: string) => void }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-xs font-semibold text-gray-500 w-20 flex-shrink-0">{label}</span>
-      <InlineEdit value={value} onSave={onSave} className="text-sm text-gray-200 flex-1" placeholder={`Add ${label.toLowerCase()}`} />
+      <span className="text-xs font-semibold text-text-muted w-20 flex-shrink-0">{label}</span>
+      <InlineEdit value={value} onSave={onSave} className="text-sm text-text-primary flex-1" placeholder={`Add ${label.toLowerCase()}`} />
     </div>
   );
 }
@@ -4395,11 +4409,11 @@ function TagList({ items, onUpdate, accent = 'gray' }: { items: string[]; onUpda
   const inputRef = useRef<HTMLInputElement>(null);
 
   const colorMap: Record<string, string> = {
-    gray: 'bg-gray-600/30 text-gray-300 border-gray-500/30',
+    gray: 'bg-surface-300/30 text-text-secondary border-border-light/30',
     amber: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
     emerald: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     sky: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
-    rose: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+    rose: 'bg-brand-500/20 text-brand-300 border-brand-500/30',
   };
   const tagClass = colorMap[accent] || colorMap.gray;
 
@@ -4425,11 +4439,11 @@ function TagList({ items, onUpdate, accent = 'gray' }: { items: string[]; onUpda
           onChange={e => setDraft(e.target.value)}
           onBlur={() => { if (draft.trim()) addTag(); else setAdding(false); }}
           onKeyDown={e => { if (e.key === 'Enter') addTag(); if (e.key === 'Escape') setAdding(false); }}
-          className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-xs text-white outline-none ring-1 ring-gray-400 w-28"
+          className="bg-surface-200 border border-border-light rounded-lg px-2 py-1 text-xs text-text-primary outline-none ring-1 ring-gray-400 w-28"
           placeholder="Add tag..."
         />
       ) : (
-        <button onClick={() => setAdding(true)} className="px-2 py-1 rounded-lg border border-dashed border-gray-700 text-xs text-gray-500 hover:text-white hover:border-gray-500 transition-colors">+</button>
+        <button onClick={() => setAdding(true)} className="px-2 py-1 rounded-lg border border-dashed border-border-light text-xs text-text-muted hover:text-text-primary hover:border-border-light transition-colors">+</button>
       )}
     </div>
   );
@@ -4478,7 +4492,7 @@ function TestMetaConnectionButton({
       <button
         onClick={handleTest}
         disabled={testing}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-xs font-medium text-gray-300 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-200 hover:bg-surface-300 disabled:opacity-40 text-xs font-medium text-text-secondary transition-colors"
       >
         {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
         Test Connection
@@ -4519,37 +4533,37 @@ function DiscoverAccountsButton({ token }: { token: string }) {
       <button
         onClick={handleDiscover}
         disabled={loading}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-xs font-medium text-gray-300 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-200 hover:bg-surface-300 disabled:opacity-40 text-xs font-medium text-text-secondary transition-colors"
       >
         {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
         Discover Instagram Accounts
       </button>
       {error && <p className="text-xs text-red-400">{error}</p>}
       {accounts && accounts.length === 0 && (
-        <p className="text-xs text-gray-500">No Facebook Pages found. Make sure your token has pages_manage_posts permission.</p>
+        <p className="text-xs text-text-muted">No Facebook Pages found. Make sure your token has pages_manage_posts permission.</p>
       )}
       {accounts && accounts.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[10px] text-gray-500">Copy the Instagram Account ID into each persona's Settings tab:</p>
+          <p className="text-[10px] text-text-muted">Copy the Instagram Account ID into each persona's Settings tab:</p>
           {accounts.map((acc, i) => (
-            <div key={i} className="bg-gray-800/50 rounded-lg p-3 text-xs space-y-1">
+            <div key={i} className="bg-surface-200/50 rounded-lg p-3 text-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="font-medium text-white">{acc.facebookPageName}</span>
-                <span className={acc.instagramAccountId ? 'text-emerald-400' : 'text-gray-500'}>{acc.status}</span>
+                <span className="font-medium text-text-primary">{acc.facebookPageName}</span>
+                <span className={acc.instagramAccountId ? 'text-emerald-400' : 'text-text-muted'}>{acc.status}</span>
               </div>
               {acc.instagramAccountId && (
                 <>
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">IG:</span>
-                    <span className="text-white font-mono">@{acc.instagramUsername}</span>
+                    <span className="text-text-muted">IG:</span>
+                    <span className="text-text-primary font-mono">@{acc.instagramUsername}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">Account ID:</span>
-                    <code className="text-rose-400 font-mono bg-gray-900 px-1.5 py-0.5 rounded select-all">{acc.instagramAccountId}</code>
+                    <span className="text-text-muted">Account ID:</span>
+                    <code className="text-brand-400 font-mono bg-surface-50 px-1.5 py-0.5 rounded select-all">{acc.instagramAccountId}</code>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">Page ID:</span>
-                    <code className="text-gray-300 font-mono bg-gray-900 px-1.5 py-0.5 rounded select-all">{acc.facebookPageId}</code>
+                    <span className="text-text-muted">Page ID:</span>
+                    <code className="text-text-secondary font-mono bg-surface-50 px-1.5 py-0.5 rounded select-all">{acc.facebookPageId}</code>
                   </div>
                 </>
               )}
@@ -4584,17 +4598,17 @@ function SettingsPanel({
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       {/* Header with Save */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-white">Settings</h2>
+        <h2 className="text-xl font-semibold text-text-primary">Settings</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={onSave}
             disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-50 text-sm font-medium transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-600 text-white hover:bg-accent-500 disabled:opacity-50 text-sm font-medium transition-colors"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             Save
           </button>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-200 text-text-muted hover:text-text-primary transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -4642,6 +4656,13 @@ function SettingsPanel({
         </Field>
       </Section>
 
+      {/* Appearance */}
+      <Section title="Appearance">
+        <Field label="Color Theme">
+          <ThemePicker />
+        </Field>
+      </Section>
+
       {/* AI Provider */}
       <Section title="AI Provider">
         <Field label="Primary LLM">
@@ -4663,7 +4684,7 @@ function SettingsPanel({
             placeholder="sk-ant-..."
           />
         </Field>
-        <p className="text-[10px] text-gray-500 mt-2 px-1">Claude Sonnet for creative tasks, Haiku for structured tasks. Get your key from console.anthropic.com</p>
+        <p className="text-[10px] text-text-muted mt-2 px-1">Claude Sonnet for creative tasks, Haiku for structured tasks. Get your key from console.anthropic.com</p>
       </Section>
 
       {/* Meta / Instagram API */}
@@ -4686,7 +4707,7 @@ function SettingsPanel({
             placeholder="App ID"
           />
         </Field>
-        <p className="text-[10px] text-gray-500 mt-2 px-1">Get your System User Token from Meta Business Manager.</p>
+        <p className="text-[10px] text-text-muted mt-2 px-1">Get your System User Token from Meta Business Manager.</p>
         {settings.metaAccessToken && (
           <DiscoverAccountsButton token={settings.metaAccessToken} />
         )}
@@ -4709,15 +4730,15 @@ function SettingsPanel({
       <PromptsManager />
 
       {/* Profile & Account */}
-      <div className="pt-6 mt-6 border-t border-gray-800 space-y-4">
-        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Account</h3>
-        <div className="flex items-center gap-3 bg-gray-800/50 rounded-xl p-4">
-          <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-300">
+      <div className="pt-6 mt-6 border-t border-border space-y-4">
+        <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">Account</h3>
+        <div className="flex items-center gap-3 bg-surface-200/50 rounded-xl p-4">
+          <div className="w-10 h-10 rounded-full bg-surface-300 flex items-center justify-center text-sm font-semibold text-text-secondary">
             {userEmail ? userEmail[0].toUpperCase() : '?'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-white font-medium truncate">{userEmail || 'Unknown user'}</p>
-            <p className="text-xs text-gray-500">Logged in</p>
+            <p className="text-sm text-text-primary font-medium truncate">{userEmail || 'Unknown user'}</p>
+            <p className="text-xs text-text-muted">Logged in</p>
           </div>
           <button
             onClick={onSignOut}
@@ -4820,17 +4841,17 @@ function DrivePickerModal({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.15 }}
-          className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col"
+          className="bg-surface-50 border border-border rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <div>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <FolderOpen className="w-5 h-5 text-gray-400" />
+              <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-text-muted" />
                 Google Drive Media
               </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-text-muted mt-0.5">
                 {filteredFiles.length} file{filteredFiles.length !== 1 ? 's' : ''}
                 {selected.size > 0 && ` · ${selected.size} selected`}
                 {mode === 'multi' && ` (max ${maxSelect})`}
@@ -4840,14 +4861,14 @@ function DrivePickerModal({
               <button
                 onClick={onSync}
                 disabled={loading}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-200 hover:bg-surface-300 text-text-secondary text-xs font-medium transition-colors disabled:opacity-50"
               >
                 <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
                 Sync Drive
               </button>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-surface-200 text-text-muted transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -4857,15 +4878,15 @@ function DrivePickerModal({
           {/* Grid */}
           <div className="flex-1 overflow-y-auto p-4">
             {loading && filteredFiles.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+              <div className="flex flex-col items-center justify-center py-16 text-text-muted">
                 <Loader2 className="w-8 h-8 animate-spin mb-3" />
                 <p className="text-sm">Syncing files from Drive...</p>
               </div>
             ) : filteredFiles.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                <FolderOpen className="w-10 h-10 mb-3 text-gray-700" />
+              <div className="flex flex-col items-center justify-center py-16 text-text-muted">
+                <FolderOpen className="w-10 h-10 mb-3 text-text-dim" />
                 <p className="text-sm">No {contentType === 'Video' ? 'video' : 'image'} files found</p>
-                <p className="text-xs text-gray-600 mt-1">Set your Drive folder URL in the persona editor and sync</p>
+                <p className="text-xs text-text-dim mt-1">Set your Drive folder URL in the persona editor and sync</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -4881,10 +4902,10 @@ function DrivePickerModal({
                         'relative rounded-xl overflow-hidden border-2 transition-all text-left group',
                         isSelected
                           ? 'border-white ring-2 ring-white/20'
-                          : 'border-gray-800 hover:border-gray-600'
+                          : 'border-border hover:border-border-light'
                       )}
                     >
-                      <div className="aspect-square bg-gray-800">
+                      <div className="aspect-square bg-surface-200">
                         {(file.thumbnailLink || file.thumbnailUrl) ? (
                           <img
                             src={file.thumbnailLink || file.thumbnailUrl}
@@ -4894,26 +4915,26 @@ function DrivePickerModal({
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            {isVideo ? <Video className="w-8 h-8 text-gray-600" /> : <Image className="w-8 h-8 text-gray-600" />}
+                            {isVideo ? <Video className="w-8 h-8 text-text-dim" /> : <Image className="w-8 h-8 text-text-dim" />}
                           </div>
                         )}
                       </div>
                       {/* Selected checkmark */}
                       {isSelected && (
                         <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white flex items-center justify-center">
-                          <Check className="w-4 h-4 text-gray-900" />
+                          <Check className="w-4 h-4 text-surface-0" />
                         </div>
                       )}
                       {/* Type badge */}
                       {isVideo && (
-                        <span className="absolute top-2 left-2 text-[9px] font-bold uppercase tracking-wider bg-rose-500/90 text-white px-1.5 py-0.5 rounded">
+                        <span className="absolute top-2 left-2 text-[9px] font-bold uppercase tracking-wider bg-brand-500/90 text-white px-1.5 py-0.5 rounded">
                           Video
                         </span>
                       )}
                       {/* File info */}
-                      <div className="p-2 bg-gray-900/80">
-                        <p className="text-[11px] text-gray-300 truncate font-medium">{file.name || file.fileName}</p>
-                        <p className="text-[10px] text-gray-600">
+                      <div className="p-2 bg-surface-50/80">
+                        <p className="text-[11px] text-text-secondary truncate font-medium">{file.name || file.fileName}</p>
+                        <p className="text-[10px] text-text-dim">
                           {isVideo ? 'Video' : 'Photo'}
                           {(file.size || file.fileSize) ? ` · ${formatSize(parseInt(file.size || file.fileSize))}` : ''}
                         </p>
@@ -4926,17 +4947,17 @@ function DrivePickerModal({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-800 flex justify-end gap-3">
+          <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 bg-gray-800 hover:bg-gray-700 transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-text-muted bg-surface-200 hover:bg-surface-300 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleUseSelected}
               disabled={selected.size === 0}
-              className="px-5 py-2 rounded-lg text-sm font-semibold bg-white hover:bg-gray-200 text-gray-900 transition-colors disabled:opacity-40"
+              className="px-5 py-2 rounded-lg text-sm font-semibold bg-accent-600 hover:bg-accent-500 text-white transition-colors disabled:opacity-40"
             >
               Use Selected{selected.size > 0 ? ` (${selected.size})` : ''}
             </button>
@@ -4984,15 +5005,15 @@ function ConfirmModal({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.15 }}
-          className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full"
+          className="bg-surface-50 border border-border rounded-2xl p-6 max-w-md w-full"
           onClick={e => e.stopPropagation()}
         >
-          <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-          <p className="text-sm text-gray-400 mb-6">{message}</p>
+          <h3 className="text-lg font-semibold text-text-primary mb-2">{title}</h3>
+          <p className="text-sm text-text-muted mb-6">{message}</p>
           <div className="flex justify-end gap-3">
             <button
               onClick={onCancel}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 bg-gray-800 hover:bg-gray-700 transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-text-muted bg-surface-200 hover:bg-surface-300 transition-colors"
             >
               Cancel
             </button>
@@ -5001,8 +5022,8 @@ function ConfirmModal({
               className={cn(
                 'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                 confirmVariant === 'danger'
-                  ? 'bg-red-500 hover:bg-red-400 text-white'
-                  : 'bg-white hover:bg-gray-200 text-gray-900'
+                  ? 'bg-red-500 hover:bg-red-400 text-text-primary'
+                  : 'bg-accent-600 hover:bg-accent-500 text-white'
               )}
             >
               {confirmLabel}
@@ -5018,10 +5039,76 @@ function ConfirmModal({
 // Shared UI Components
 // ============================================================================
 
+// ============================================================================
+// Theme Picker
+// ============================================================================
+
+const THEMES = [
+  { id: 'default', label: 'Studio Dark', desc: 'Dark violet theme', mode: 'dark', colors: ['#7c3aed', '#f43f5e', '#1a1a2e'] },
+  { id: 'claude', label: 'Claude Light', desc: 'Warm cream & terracotta', mode: 'light', colors: ['#c2956a', '#f5f0e8', '#3d2e1e'] },
+  { id: 'midnight', label: 'Midnight', desc: 'Deep navy blue', mode: 'dark', colors: ['#5b8af5', '#4ba3d4', '#1a1a2e'] },
+];
+
+function ThemePicker() {
+  const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('cs_theme') || 'default');
+
+  const applyTheme = (themeId: string) => {
+    setCurrentTheme(themeId);
+    localStorage.setItem('cs_theme', themeId);
+
+    const theme = THEMES.find(t => t.id === themeId);
+
+    // Set color theme
+    if (themeId === 'default') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', themeId);
+    }
+
+    // Set mode (light/dark) based on theme's inherent mode
+    if (theme?.mode === 'light') {
+      document.documentElement.setAttribute('data-mode', 'light');
+      localStorage.setItem('cs_mode', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-mode');
+      localStorage.setItem('cs_mode', 'dark');
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        {THEMES.map(theme => (
+          <button
+            key={theme.id}
+            onClick={() => applyTheme(theme.id)}
+            className={cn(
+              'flex items-center gap-3 px-3 py-3 rounded-xl border transition-all text-left',
+              currentTheme === theme.id
+                ? 'border-accent-500 bg-accent-500/10 ring-1 ring-accent-500/30'
+                : 'border-border bg-surface-50/40 hover:border-border-light'
+            )}
+          >
+            <div className="flex -space-x-1 flex-shrink-0">
+              {theme.colors.map((color, i) => (
+                <div key={i} className="w-5 h-5 rounded-full border-2 border-surface-0" style={{ backgroundColor: color }} />
+              ))}
+            </div>
+            <div>
+              <p className={cn('text-xs font-medium', currentTheme === theme.id ? 'text-accent-300' : 'text-text-primary')}>{theme.label}</p>
+              <p className="text-[10px] text-text-dim">{theme.desc}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">{title}</h3>
+      <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">{title}</h3>
       {children}
     </div>
   );
@@ -5030,7 +5117,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={className}>
-      <label className="block text-xs text-gray-400 font-medium mb-1">{label}</label>
+      <label className="block text-xs text-text-muted font-medium mb-1">{label}</label>
       {children}
     </div>
   );

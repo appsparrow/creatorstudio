@@ -78,21 +78,21 @@ export function ProductionLibrarySidebar({ onClose, activeSection, onSelectSecti
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <BookOpen className="w-6 h-6 text-violet-400 animate-pulse" />
+        <BookOpen className="w-6 h-6 text-accent-400 animate-pulse" />
       </div>
     );
   }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex-shrink-0 px-5 py-4 border-b border-gray-800">
-        <button onClick={onClose} className="flex items-center gap-2 text-xs text-gray-400 hover:text-white transition-colors mb-2">
+      <div className="flex-shrink-0 px-5 py-4 border-b border-border">
+        <button onClick={onClose} className="flex items-center gap-2 text-xs text-text-muted hover:text-text-primary transition-colors mb-2">
           <ArrowLeft className="w-3.5 h-3.5" /> Posts
         </button>
-        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-violet-400" /> Production Library
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-accent-400" /> Production Library
         </h3>
-        <p className="text-[11px] text-gray-500 mt-1">Click a section to explore</p>
+        <p className="text-[11px] text-text-muted mt-1">Click a section to explore</p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -111,33 +111,33 @@ export function ProductionLibrarySidebar({ onClose, activeSection, onSelectSecti
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all text-left group',
                 isActive
-                  ? 'border-violet-500/50 bg-violet-500/10'
-                  : 'border-gray-800 bg-gray-900/40 hover:border-violet-500/30 hover:bg-gray-900/60'
+                  ? 'border-accent-500/50 bg-accent-500/10'
+                  : 'border-border bg-surface-50/40 hover:border-accent-500/30 hover:bg-surface-50/60'
               )}
             >
               <div className={cn(
                 'w-9 h-9 rounded-lg flex items-center justify-center transition-colors',
-                isActive ? 'bg-violet-500/30 text-violet-300' : 'bg-violet-500/10 text-violet-400 group-hover:bg-violet-500/20'
+                isActive ? 'bg-accent-500/30 text-accent-300' : 'bg-accent-500/10 text-accent-400 group-hover:bg-accent-500/20'
               )}>
                 {section.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <p className={cn('text-sm font-medium', isActive ? 'text-violet-200' : 'text-white')}>{section.label}</p>
-                <p className="text-[11px] text-gray-500">{section.desc}</p>
+                <p className={cn('text-sm font-medium', isActive ? 'text-accent-200' : 'text-text-primary')}>{section.label}</p>
+                <p className="text-[11px] text-text-muted">{section.desc}</p>
               </div>
-              <span className="text-xs text-gray-600 bg-gray-800 px-2 py-0.5 rounded-full">{count}</span>
+              <span className="text-xs text-text-dim bg-surface-200 px-2 py-0.5 rounded-full">{count}</span>
             </button>
           );
         })}
 
         {/* Stats */}
-        <div className="mt-4 px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-950/40">
-          <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Library Stats</p>
+        <div className="mt-4 px-4 py-3 rounded-xl border border-border/50 bg-surface-0/40">
+          <p className="text-[10px] text-text-dim uppercase tracking-wider mb-2">Library Stats</p>
           <div className="grid grid-cols-2 gap-2 text-center">
-            <div><p className="text-lg font-bold text-violet-400">{hooks.length}</p><p className="text-[10px] text-gray-500">Hooks</p></div>
-            <div><p className="text-lg font-bold text-violet-400">{formats.length}</p><p className="text-[10px] text-gray-500">Formats</p></div>
-            <div><p className="text-lg font-bold text-violet-400">{rules.length}</p><p className="text-[10px] text-gray-500">Rules</p></div>
-            <div><p className="text-lg font-bold text-violet-400">{locations.length}</p><p className="text-[10px] text-gray-500">Settings</p></div>
+            <div><p className="text-lg font-bold text-accent-400">{hooks.length}</p><p className="text-[10px] text-text-muted">Hooks</p></div>
+            <div><p className="text-lg font-bold text-accent-400">{formats.length}</p><p className="text-[10px] text-text-muted">Formats</p></div>
+            <div><p className="text-lg font-bold text-accent-400">{rules.length}</p><p className="text-[10px] text-text-muted">Rules</p></div>
+            <div><p className="text-lg font-bold text-accent-400">{locations.length}</p><p className="text-[10px] text-text-muted">Settings</p></div>
           </div>
         </div>
       </div>
@@ -161,7 +161,7 @@ export function ProductionLibraryCanvas({ activeSection, onSelectSection }: Prod
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <BookOpen className="w-8 h-8 text-violet-400 animate-pulse" />
+        <BookOpen className="w-8 h-8 text-accent-400 animate-pulse" />
       </div>
     );
   }
@@ -170,23 +170,23 @@ export function ProductionLibraryCanvas({ activeSection, onSelectSection }: Prod
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center max-w-sm">
-          <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
-            <BookOpen className="w-8 h-8 text-violet-400" />
+          <div className="w-16 h-16 rounded-2xl bg-accent-500/10 flex items-center justify-center mx-auto mb-4">
+            <BookOpen className="w-8 h-8 text-accent-400" />
           </div>
-          <h2 className="text-xl font-semibold text-white mb-2">Production Library</h2>
-          <p className="text-sm text-gray-500 mb-6">Your knowledge engine for content production. Select a section from the sidebar to explore hooks, formats, decision trees, and location settings.</p>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">Production Library</h2>
+          <p className="text-sm text-text-muted mb-6">Your knowledge engine for content production. Select a section from the sidebar to explore hooks, formats, decision trees, and location settings.</p>
           <div className="grid grid-cols-2 gap-3">
             {SECTIONS.map(section => (
               <button
                 key={section.key}
                 onClick={() => onSelectSection(section.key)}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-800 bg-gray-900/40 hover:border-violet-500/30 hover:bg-gray-900/60 transition-all"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-surface-50/40 hover:border-accent-500/30 hover:bg-surface-50/60 transition-all"
               >
-                <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-400">
+                <div className="w-10 h-10 rounded-lg bg-accent-500/10 flex items-center justify-center text-accent-400">
                   {section.icon}
                 </div>
-                <span className="text-sm font-medium text-white">{section.label}</span>
-                <span className="text-[11px] text-gray-500">{section.desc}</span>
+                <span className="text-sm font-medium text-text-primary">{section.label}</span>
+                <span className="text-[11px] text-text-muted">{section.desc}</span>
               </button>
             ))}
           </div>
@@ -200,20 +200,20 @@ export function ProductionLibraryCanvas({ activeSection, onSelectSection }: Prod
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <span className="text-violet-400">{sectionMeta?.icon}</span>
+          <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+            <span className="text-accent-400">{sectionMeta?.icon}</span>
             {sectionMeta?.label}
           </h2>
-          <p className="text-xs text-gray-500 mt-0.5">{sectionMeta?.desc}</p>
+          <p className="text-xs text-text-muted mt-0.5">{sectionMeta?.desc}</p>
         </div>
         {(activeSection === 'hooks' || activeSection === 'formats') && (
-          <div className="flex bg-gray-800 rounded-lg overflow-hidden">
+          <div className="flex bg-surface-200 rounded-lg overflow-hidden">
             {(['all', 'tiktok', 'instagram'] as const).map(p => (
               <button key={p} onClick={() => setPlatformFilter(p)}
                 className={cn('px-3 py-1.5 text-xs font-medium transition-colors capitalize',
-                  platformFilter === p ? 'bg-violet-500/20 text-violet-300' : 'text-gray-500 hover:text-gray-300'
+                  platformFilter === p ? 'bg-accent-500/20 text-accent-300' : 'text-text-muted hover:text-text-secondary'
                 )}>
                 {p === 'all' ? 'All' : p === 'tiktok' ? 'TikTok' : 'IG'}
               </button>
@@ -290,50 +290,49 @@ function HooksView({ items, platformFilter }: { items: LibraryItem[]; platformFi
             key={item.slug}
             className={cn(
               'border rounded-xl overflow-hidden transition-all',
-              isEditing ? 'border-amber-500/40 bg-gray-900/60' : isExpanded ? 'border-violet-500/40 bg-gray-900/60' : 'border-gray-800 bg-gray-900/30',
+              isEditing ? 'border-amber-500/40 bg-surface-50/60' : isExpanded ? 'border-accent-500/40 bg-surface-50/60' : 'border-border bg-surface-50/30',
               dimmed && 'opacity-40'
             )}
           >
             <button onClick={() => !isEditing && setExpandedSlug(isExpanded ? null : item.slug)} className="w-full px-4 py-3 text-left flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center flex-shrink-0">
-                <Zap className="w-4 h-4 text-violet-400" />
+              <div className="w-8 h-8 rounded-lg bg-accent-500/10 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-4 h-4 text-accent-400" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-white">{item.label}</span>
+                  <span className="text-sm font-medium text-text-primary">{item.label}</span>
                   <PlatformTag platform={item.platform} />
-                  <span className="ml-auto text-xs font-bold text-violet-400">{item.performance_score}</span>
+                  <span className="ml-auto text-xs font-bold text-accent-400">{item.performance_score}</span>
                 </div>
-                <p className="text-[11px] text-gray-500 mt-0.5 font-mono truncate">{d.structure}</p>
+                <p className="text-[11px] text-text-muted mt-0.5 font-mono truncate">{d.structure}</p>
               </div>
-              {!isEditing && (isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />)}
+              {!isEditing && (isExpanded ? <ChevronUp className="w-4 h-4 text-text-muted" /> : <ChevronDown className="w-4 h-4 text-text-muted" />)}
             </button>
 
             {isExpanded && (
-              <div className="px-4 pb-4 border-t border-gray-800/50 pt-3 space-y-3">
+              <div className="px-4 pb-4 border-t border-border/50 pt-3 space-y-3">
                 {/* Edit / View toggle */}
                 <div className="flex items-center justify-end gap-2">
                   {isEditing ? (
                     <>
                       <button onClick={() => saveEdit(item)} disabled={saving}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-text-primary transition-colors">
                         {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
                       </button>
                       <button onClick={() => setEditingId(null)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white transition-colors">
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-primary transition-colors">
                         Cancel
                       </button>
                     </>
                   ) : (
                     <button onClick={() => startEdit(item)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 border border-gray-700 hover:text-white hover:border-gray-500 transition-colors">
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-muted border border-border-light hover:text-text-primary hover:border-border-light transition-colors">
                       <Pencil className="w-3 h-3" /> Edit
                     </button>
                   )}
                 </div>
 
                 {isEditing ? (
-                  /* Edit mode */
                   <div className="space-y-3">
                     <EditField label="Structure" value={d.structure} onChange={v => setEditData({ ...editData, structure: v })} mono />
                     <EditField label="Psychology" value={d.psychology || ''} onChange={v => setEditData({ ...editData, psychology: v })} />
@@ -342,26 +341,25 @@ function HooksView({ items, platformFilter }: { items: LibraryItem[]; platformFi
                     <div>
                       <MiniLabel>Best For (comma separated)</MiniLabel>
                       <input value={(d.bestFor || []).join(', ')} onChange={e => setEditData({ ...editData, bestFor: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })}
-                        className="w-full mt-1 bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 outline-none focus:ring-1 focus:ring-violet-500/50" />
+                        className="w-full mt-1 bg-surface-0 border border-border-light rounded-lg px-3 py-2 text-xs text-text-secondary outline-none focus:ring-1 focus:ring-accent-500/50" />
                     </div>
                     <div>
                       <MiniLabel>Examples (one per line)</MiniLabel>
                       <textarea value={(d.examples || []).join('\n')} onChange={e => setEditData({ ...editData, examples: e.target.value.split('\n').filter(Boolean) })}
-                        rows={4} className="w-full mt-1 bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 outline-none focus:ring-1 focus:ring-violet-500/50 resize-y" />
+                        rows={4} className="w-full mt-1 bg-surface-0 border border-border-light rounded-lg px-3 py-2 text-xs text-text-secondary outline-none focus:ring-1 focus:ring-accent-500/50 resize-y" />
                     </div>
                   </div>
                 ) : (
-                  /* View mode */
                   <>
                     <div>
                       <MiniLabel>Structure</MiniLabel>
-                      <p className="text-xs text-violet-300 font-mono bg-gray-950 rounded-lg px-3 py-2 mt-1">{d.structure}</p>
+                      <p className="text-xs text-accent-300 font-mono bg-surface-0 rounded-lg px-3 py-2 mt-1">{d.structure}</p>
                     </div>
                     <div>
                       <MiniLabel>Best For</MiniLabel>
                       <div className="flex flex-wrap gap-1.5 mt-1">
                         {(d.bestFor || []).map((b: string, i: number) => (
-                          <span key={i} className="px-2 py-0.5 rounded-full text-[10px] bg-gray-800 text-gray-300 border border-gray-700">{b}</span>
+                          <span key={i} className="px-2 py-0.5 rounded-full text-[10px] bg-surface-200 text-text-secondary border border-border-light">{b}</span>
                         ))}
                       </div>
                     </div>
@@ -370,8 +368,8 @@ function HooksView({ items, platformFilter }: { items: LibraryItem[]; platformFi
                       <div className="space-y-1.5 mt-1">
                         {(d.examples || []).map((ex: string, i: number) => (
                           <div key={i} className="flex items-start gap-2 text-xs">
-                            <span className="text-gray-600 mt-0.5">{i + 1}.</span>
-                            <span className="text-gray-300 italic">"{ex}"</span>
+                            <span className="text-text-dim mt-0.5">{i + 1}.</span>
+                            <span className="text-text-secondary italic">"{ex}"</span>
                           </div>
                         ))}
                       </div>
@@ -379,7 +377,7 @@ function HooksView({ items, platformFilter }: { items: LibraryItem[]; platformFi
                     {d.psychology && (
                       <div>
                         <MiniLabel>Psychology</MiniLabel>
-                        <p className="text-[11px] text-gray-400 mt-1">{d.psychology}</p>
+                        <p className="text-[11px] text-text-muted mt-1">{d.psychology}</p>
                       </div>
                     )}
                     {d.tips && (
@@ -389,7 +387,7 @@ function HooksView({ items, platformFilter }: { items: LibraryItem[]; platformFi
                       </div>
                     )}
                     {d.triggerCondition && (
-                      <div className="text-[10px] text-gray-600 font-mono bg-gray-950 rounded px-2 py-1">
+                      <div className="text-[10px] text-text-dim font-mono bg-surface-0 rounded px-2 py-1">
                         Trigger: {d.triggerCondition}
                       </div>
                     )}
@@ -423,7 +421,7 @@ function FormatsView({ items, platformFilter }: { items: LibraryItem[]; platform
             key={item.slug}
             className={cn(
               'border rounded-xl overflow-hidden transition-all',
-              isExpanded ? 'border-violet-500/40 bg-gray-900/60' : 'border-gray-800 bg-gray-900/30',
+              isExpanded ? 'border-accent-500/40 bg-surface-50/60' : 'border-border bg-surface-50/30',
               dimmed && 'opacity-40'
             )}
           >
@@ -433,35 +431,35 @@ function FormatsView({ items, platformFilter }: { items: LibraryItem[]; platform
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-white">{item.label}</span>
+                  <span className="text-sm font-medium text-text-primary">{item.label}</span>
                   <PlatformTag platform={item.platform} />
-                  <span className="ml-auto text-xs text-gray-500">{d.duration}</span>
+                  <span className="ml-auto text-xs text-text-muted">{d.duration}</span>
                 </div>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {(d.bestFor || []).slice(0, 3).map((b: string, i: number) => (
-                    <span key={i} className="text-[10px] text-gray-500">{b}{i < 2 && (d.bestFor || []).length > i + 1 ? ' ·' : ''}</span>
+                    <span key={i} className="text-[10px] text-text-muted">{b}{i < 2 && (d.bestFor || []).length > i + 1 ? ' ·' : ''}</span>
                   ))}
                 </div>
               </div>
-              {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+              {isExpanded ? <ChevronUp className="w-4 h-4 text-text-muted" /> : <ChevronDown className="w-4 h-4 text-text-muted" />}
             </button>
 
             {isExpanded && d.timing && (
-              <div className="px-4 pb-4 border-t border-gray-800/50 pt-3 space-y-3">
+              <div className="px-4 pb-4 border-t border-border/50 pt-3 space-y-3">
                 <div>
                   <MiniLabel>Timing Breakdown</MiniLabel>
                   <div className="space-y-1 mt-1.5">
                     {Object.entries(d.timing).map(([key, val]) => (
                       <div key={key} className="flex items-center gap-2 text-xs">
-                        <span className="w-16 text-violet-400 font-medium capitalize">{key}</span>
-                        <span className="text-gray-300">{val as string}</span>
+                        <span className="w-16 text-accent-400 font-medium capitalize">{key}</span>
+                        <span className="text-text-secondary">{val as string}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-[11px] text-gray-500">
+                <div className="flex items-center gap-4 text-[11px] text-text-muted">
                   <span>Words: {d.wordCount}</span>
-                  <span>Score: <span className="text-violet-400 font-bold">{item.performance_score}</span></span>
+                  <span>Score: <span className="text-accent-400 font-bold">{item.performance_score}</span></span>
                 </div>
                 {d.tips && (
                   <p className="text-[11px] text-amber-300/80">{d.tips}</p>
@@ -482,16 +480,16 @@ function FormatsView({ items, platformFilter }: { items: LibraryItem[]; platform
 function DecisionTreeView({ items }: { items: LibraryItem[] }) {
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-gray-500 mb-3">Product category → recommended hook + format + setting</p>
+      <p className="text-[11px] text-text-muted mb-3">Product category → recommended hook + format + setting</p>
       {items.map(item => {
         const d = item.data as any;
         return (
-          <div key={item.slug} className="border border-gray-800 rounded-xl p-4 bg-gray-900/30 space-y-2.5">
-            <p className="text-sm font-medium text-white">{item.label}</p>
+          <div key={item.slug} className="border border-border rounded-xl p-4 bg-surface-50/30 space-y-2.5">
+            <p className="text-sm font-medium text-text-primary">{item.label}</p>
             <div className="grid grid-cols-3 gap-2">
-              <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg px-2.5 py-2">
-                <p className="text-[9px] text-violet-500 uppercase">Hook</p>
-                <p className="text-xs text-violet-300 font-medium mt-0.5">{(d.recommendedHook || '').replace('hook_', '').replace(/_/g, ' ')}</p>
+              <div className="bg-accent-500/10 border border-accent-500/20 rounded-lg px-2.5 py-2">
+                <p className="text-[9px] text-accent-500 uppercase">Hook</p>
+                <p className="text-xs text-accent-300 font-medium mt-0.5">{(d.recommendedHook || '').replace('hook_', '').replace(/_/g, ' ')}</p>
               </div>
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-2.5 py-2">
                 <p className="text-[9px] text-blue-500 uppercase">Format</p>
@@ -502,9 +500,9 @@ function DecisionTreeView({ items }: { items: LibraryItem[] }) {
                 <p className="text-xs text-emerald-300 font-medium mt-0.5">{(d.recommendedSetting || '').replace('setting_', '').replace(/_/g, ' ')}</p>
               </div>
             </div>
-            <p className="text-[11px] text-gray-500">{d.reasoning}</p>
+            <p className="text-[11px] text-text-muted">{d.reasoning}</p>
             {d.alternateHook && (
-              <p className="text-[10px] text-gray-600">Alt hook: {d.alternateHook.replace('hook_', '').replace(/_/g, ' ')}</p>
+              <p className="text-[10px] text-text-dim">Alt hook: {d.alternateHook.replace('hook_', '').replace(/_/g, ' ')}</p>
             )}
           </div>
         );
@@ -523,26 +521,26 @@ function SettingsGuideView({ items }: { items: LibraryItem[] }) {
       {items.map(item => {
         const d = item.data as any;
         return (
-          <div key={item.slug} className="border border-gray-800 rounded-xl p-4 bg-gray-900/30 space-y-2">
+          <div key={item.slug} className="border border-border rounded-xl p-4 bg-surface-50/30 space-y-2">
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-emerald-400" />
-              <p className="text-sm font-medium text-white">{item.label}</p>
+              <p className="text-sm font-medium text-text-primary">{item.label}</p>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {(d.forCategories || []).map((c: string, i: number) => (
-                <span key={i} className="px-2 py-0.5 rounded-full text-[10px] bg-gray-800 text-gray-300 border border-gray-700">{c}</span>
+                <span key={i} className="px-2 py-0.5 rounded-full text-[10px] bg-surface-200 text-text-secondary border border-border-light">{c}</span>
               ))}
             </div>
             <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div><span className="text-gray-600">Visual:</span> <span className="text-gray-400">{d.visual}</span></div>
-              <div><span className="text-gray-600">Outfit:</span> <span className="text-gray-400">{d.outfit}</span></div>
-              <div><span className="text-gray-600">Lighting:</span> <span className="text-gray-400">{d.lighting}</span></div>
-              <div><span className="text-gray-600">Mood:</span> <span className="text-gray-400">{d.mood}</span></div>
+              <div><span className="text-text-dim">Visual:</span> <span className="text-text-muted">{d.visual}</span></div>
+              <div><span className="text-text-dim">Outfit:</span> <span className="text-text-muted">{d.outfit}</span></div>
+              <div><span className="text-text-dim">Lighting:</span> <span className="text-text-muted">{d.lighting}</span></div>
+              <div><span className="text-text-dim">Mood:</span> <span className="text-text-muted">{d.mood}</span></div>
             </div>
             {d.props && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {(d.props as string[]).map((p, i) => (
-                  <span key={i} className="text-[10px] text-gray-500 bg-gray-800/60 px-1.5 py-0.5 rounded">{p}</span>
+                  <span key={i} className="text-[10px] text-text-muted bg-surface-200/60 px-1.5 py-0.5 rounded">{p}</span>
                 ))}
               </div>
             )}
@@ -562,7 +560,7 @@ function PlatformTag({ platform }: { platform: string }) {
   return (
     <span className={cn(
       'px-1.5 py-0.5 rounded text-[9px] font-medium border',
-      platform === 'tiktok' ? 'text-gray-400 border-gray-700 bg-gray-800' : 'text-pink-400 border-pink-500/20 bg-pink-500/10'
+      platform === 'tiktok' ? 'text-text-muted border-border-light bg-surface-200' : 'text-pink-400 border-pink-500/20 bg-pink-500/10'
     )}>
       {platform === 'tiktok' ? 'TikTok' : 'IG'}
     </span>
@@ -570,7 +568,7 @@ function PlatformTag({ platform }: { platform: string }) {
 }
 
 function MiniLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">{children}</p>;
+  return <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium">{children}</p>;
 }
 
 function EditField({ label, value, onChange, mono }: { label: string; value: string; onChange: (v: string) => void; mono?: boolean }) {
@@ -580,7 +578,7 @@ function EditField({ label, value, onChange, mono }: { label: string; value: str
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
-        className={cn('w-full mt-1 bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 outline-none focus:ring-1 focus:ring-violet-500/50', mono && 'font-mono')}
+        className={cn('w-full mt-1 bg-surface-0 border border-border-light rounded-lg px-3 py-2 text-xs text-text-secondary outline-none focus:ring-1 focus:ring-accent-500/50', mono && 'font-mono')}
       />
     </div>
   );

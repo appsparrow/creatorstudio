@@ -32,9 +32,9 @@ export default function UGCPipelineView({ personaId, persona, onCreatePost }: UG
 
   if (!personaId || !persona) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500">
+      <div className="flex-1 flex items-center justify-center text-text-muted">
         <div className="text-center">
-          <Zap className="w-12 h-12 mx-auto mb-3 text-gray-700" />
+          <Zap className="w-12 h-12 mx-auto mb-3 text-text-dim" />
           <p className="text-lg">Select a persona to use UGC</p>
         </div>
       </div>
@@ -73,15 +73,15 @@ function RunListView({ personaId, onSelectRun, onNewRun }: {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Zap className="w-5 h-5 text-violet-400" />
+            <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+              <Zap className="w-5 h-5 text-accent-400" />
               UGC Video Factory
             </h2>
-            <p className="text-sm text-gray-400 mt-1">Generate product-to-video content packages</p>
+            <p className="text-sm text-text-muted mt-1">Generate product-to-video content packages</p>
           </div>
           <button
             onClick={onNewRun}
-            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-4 py-2.5 rounded-lg transition-colors font-medium text-sm"
+            className="flex items-center gap-2 bg-accent-600 hover:bg-accent-500 text-white px-4 py-2.5 rounded-lg transition-colors font-medium text-sm"
           >
             <Plus className="w-4 h-4" />
             New Video Package
@@ -90,7 +90,7 @@ function RunListView({ personaId, onSelectRun, onNewRun }: {
 
         {/* Runs */}
         {runs.length === 0 ? (
-          <div className="text-center py-20 text-gray-500">
+          <div className="text-center py-20 text-text-muted">
             <Package className="w-16 h-16 mx-auto mb-4 opacity-30" />
             <p className="text-lg">No video packages yet</p>
             <p className="text-sm mt-2">Click "New Video Package" to generate your first UGC content package</p>
@@ -108,37 +108,37 @@ function RunListView({ personaId, onSelectRun, onNewRun }: {
                   key={run.id}
                   onClick={() => onSelectRun(run.id)}
                   className={cn(
-                    'w-full text-left border rounded-xl p-5 transition-all hover:border-violet-500/40 hover:bg-gray-900/60 group',
-                    cfg.border, 'bg-gray-900/40'
+                    'w-full text-left border rounded-xl p-5 transition-all hover:border-accent-500/40 hover:bg-surface-50/60 group',
+                    cfg.border, 'bg-surface-50/40'
                   )}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3">
-                        <h3 className="font-semibold text-white truncate">{run.productIntel?.productName ?? 'Untitled'}</h3>
+                        <h3 className="font-semibold text-text-primary truncate">{run.productIntel?.productName ?? 'Untitled'}</h3>
                         <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', cfg.bg, cfg.color)}>
                           <StatusIcon className={cn('w-3 h-3', run.status === 'running' && 'animate-spin')} />
                           {cfg.label}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-500">
+                      <div className="flex items-center gap-2 mt-1.5 text-xs text-text-muted">
                         {run.startedAt && <span>{new Date(run.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
-                        {run.strategy?.hookFormat && <><span className="text-gray-700">·</span><span>{run.strategy.hookFormat}</span></>}
-                        {run.script?.estimatedDuration && <><span className="text-gray-700">·</span><span>{run.script.estimatedDuration}</span></>}
-                        {run.productIntel?.price != null && <><span className="text-gray-700">·</span><span>${run.productIntel.price}</span></>}
-                        <span className="text-gray-700">·</span>
+                        {run.strategy?.hookFormat && <><span className="text-text-dim">·</span><span>{run.strategy.hookFormat}</span></>}
+                        {run.script?.estimatedDuration && <><span className="text-text-dim">·</span><span>{run.script.estimatedDuration}</span></>}
+                        {run.productIntel?.price != null && <><span className="text-text-dim">·</span><span>${run.productIntel.price}</span></>}
+                        <span className="text-text-dim">·</span>
                         <span>{completedSteps}/{run.steps.length} steps</span>
                       </div>
                       {run.script?.selectedHook && (
-                        <p className="text-sm text-gray-300 mt-2 line-clamp-1">Hook: "{run.script.selectedHook}"</p>
+                        <p className="text-sm text-text-secondary mt-2 line-clamp-1">Hook: "{run.script.selectedHook}"</p>
                       )}
                       {run.status === 'running' && (
-                        <div className="mt-3 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-violet-500 to-rose-500 rounded-full" style={{ width: `${pct}%` }} />
+                        <div className="mt-3 h-1.5 bg-surface-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-accent-500 to-brand-500 rounded-full" style={{ width: `${pct}%` }} />
                         </div>
                       )}
                     </div>
-                    <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-violet-400 transition-colors mt-1 flex-shrink-0" />
+                    <ChevronRight className="w-5 h-5 text-text-dim group-hover:text-accent-400 transition-colors mt-1 flex-shrink-0" />
                   </div>
                 </button>
               );
@@ -198,21 +198,21 @@ function RunDetailView({ runId, persona, onBack, onCreatePost }: {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Top bar — product info + actions */}
-      <div className="flex-shrink-0 border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm">
+      <div className="flex-shrink-0 border-b border-border bg-surface-0/80 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-6 py-4">
           {/* Row 1: Back + product name + mode */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors">
+              <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-surface-200 text-text-muted hover:text-text-primary transition-colors">
                 <ArrowLeft className="w-4 h-4" />
               </button>
               {run?.productIntel ? (
                 <div>
-                  <h2 className="text-base font-semibold text-white">{run.productIntel.productName}</h2>
-                  <p className="text-xs text-gray-500">{run.productIntel.brand} · ${run.productIntel.price} · {run.productIntel.category}</p>
+                  <h2 className="text-base font-semibold text-text-primary">{run.productIntel.productName}</h2>
+                  <p className="text-xs text-text-muted">{run.productIntel.brand} · ${run.productIntel.price} · {run.productIntel.category}</p>
                 </div>
               ) : (
-                <h2 className="text-base font-semibold text-white">New Video Package</h2>
+                <h2 className="text-base font-semibold text-text-primary">New Video Package</h2>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -223,7 +223,7 @@ function RunDetailView({ runId, persona, onBack, onCreatePost }: {
                     <Check className="w-3.5 h-3.5" /> Posted
                   </div>
                 ) : (
-                  <button onClick={handleCreatePost} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-xs font-semibold text-white transition-colors">
+                  <button onClick={handleCreatePost} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-500 text-xs font-semibold text-white transition-colors">
                     <Send className="w-3.5 h-3.5" /> Create Post
                   </button>
                 )
@@ -239,12 +239,12 @@ function RunDetailView({ runId, persona, onBack, onCreatePost }: {
                 value={productUrl}
                 onChange={e => setProductUrl(e.target.value)}
                 placeholder="Paste product URL or describe the product..."
-                className="flex-1 bg-gray-900/60 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 text-sm outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/50"
+                className="flex-1 bg-surface-50/60 border border-border-light rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm outline-none focus:ring-1 focus:ring-accent-500/50 focus:border-accent-500/50"
               />
               <button
                 onClick={handleGenerate}
                 disabled={!productUrl.trim()}
-                className="px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-sm font-semibold text-white transition-colors flex items-center gap-2"
+                className="px-6 py-3 rounded-xl bg-accent-600 hover:bg-accent-500 disabled:opacity-40 text-sm font-semibold text-white transition-colors flex items-center gap-2"
               >
                 <Sparkles className="w-4 h-4" /> Generate
               </button>
@@ -269,19 +269,19 @@ function RunDetailView({ runId, persona, onBack, onCreatePost }: {
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap',
                       isActive
-                        ? 'border-violet-500 text-violet-300'
-                        : 'border-transparent hover:border-gray-600',
-                      isPending && !isActive ? 'text-gray-600' : '',
-                      isComplete && !isActive ? 'text-gray-300' : '',
+                        ? 'border-accent-500 text-accent-300'
+                        : 'border-transparent hover:border-border-light',
+                      isPending && !isActive ? 'text-text-dim' : '',
+                      isComplete && !isActive ? 'text-text-secondary' : '',
                       isRunning && !isActive ? 'text-amber-400' : '',
                     )}
                   >
                     {isComplete ? <Check className="w-3 h-3 text-emerald-400" /> :
                      isRunning ? <Loader2 className="w-3 h-3 animate-spin text-amber-400" /> :
-                     <span className="text-gray-500">{tab.icon}</span>}
+                     <span className="text-text-muted">{tab.icon}</span>}
                     {tab.label}
                     {duration && isComplete && (
-                      <span className="text-[10px] text-gray-600">({duration})</span>
+                      <span className="text-[10px] text-text-dim">({duration})</span>
                     )}
                   </button>
                 );
@@ -305,8 +305,8 @@ function RunDetailView({ runId, persona, onBack, onCreatePost }: {
                 <PipelineStepInfo icon={<Mic className="w-4 h-4" />} label="Audio Direction" desc="ElevenLabs payload, trending sounds, mixing instructions" model="haiku" />
                 <PipelineStepInfo icon={<Hash className="w-4 h-4" />} label="Metadata" desc="TikTok title, caption, 5 hashtags, posting schedule, pinned comment, auto-replies + Instagram caption" model="haiku" />
               </div>
-              <p className="text-[11px] text-gray-600 text-center">
-                Persona: <span className="text-gray-400">{persona.identity.fullName}</span> — character lock ensures visual consistency across all shots
+              <p className="text-[11px] text-text-dim text-center">
+                Persona: <span className="text-text-muted">{persona.identity.fullName}</span> — character lock ensures visual consistency across all shots
               </p>
             </div>
           )}
@@ -338,7 +338,7 @@ function RunDetailView({ runId, persona, onBack, onCreatePost }: {
 
 function StepPending({ label }: { label: string }) {
   return (
-    <div className="flex items-center justify-center py-20 text-gray-600">
+    <div className="flex items-center justify-center py-20 text-text-dim">
       <div className="text-center">
         <Loader2 className="w-8 h-8 mx-auto mb-3 opacity-30" />
         <p className="text-sm">{label} — waiting for previous steps</p>
@@ -352,10 +352,10 @@ function StepPending({ label }: { label: string }) {
 // =============================================================================
 
 const STATUS_STYLES: Record<UGCStepStatus, { icon: React.ReactNode; ring: string }> = {
-  pending:  { icon: <span className="w-2 h-2 rounded-full bg-gray-600" />, ring: 'border-gray-800' },
+  pending:  { icon: <span className="w-2 h-2 rounded-full bg-text-dim" />, ring: 'border-border' },
   running:  { icon: <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />, ring: 'border-amber-500/40' },
   complete: { icon: <Check className="w-4 h-4 text-emerald-400" />, ring: 'border-emerald-500/30' },
-  paused:   { icon: <Pause className="w-4 h-4 text-violet-400" />, ring: 'border-violet-500/40' },
+  paused:   { icon: <Pause className="w-4 h-4 text-accent-400" />, ring: 'border-accent-500/40' },
   error:    { icon: <AlertCircle className="w-4 h-4 text-red-400" />, ring: 'border-red-500/40' },
   edited:   { icon: <Pencil className="w-4 h-4 text-blue-400" />, ring: 'border-blue-500/30' },
 };
@@ -382,28 +382,28 @@ function StepCard({ name, step, expanded, onToggle, summary, reviewGate, childre
   const info = STEP_LABELS[name];
 
   return (
-    <div className={cn('border rounded-xl transition-all', ss.ring, 'bg-gray-900/40')}>
+    <div className={cn('border rounded-xl transition-all', ss.ring, 'bg-surface-50/40')}>
       <button onClick={onToggle} className="w-full flex items-center gap-3 px-5 py-4 text-left">
         <div className="flex-shrink-0">{ss.icon}</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-gray-400">{info.icon}</span>
-            <span className="text-sm font-medium text-white">{info.label}</span>
+            <span className="text-text-muted">{info.icon}</span>
+            <span className="text-sm font-medium text-text-primary">{info.label}</span>
             {reviewGate && step.status === 'complete' && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-500/15 text-violet-400 border border-violet-500/20">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent-500/15 text-accent-400 border border-accent-500/20">
                 <Eye className="w-2.5 h-2.5" /> Review
               </span>
             )}
             {step.durationMs != null && step.status !== 'pending' && step.status !== 'running' && (
-              <span className="text-[11px] text-gray-600">({(step.durationMs / 1000).toFixed(1)}s)</span>
+              <span className="text-[11px] text-text-dim">({(step.durationMs / 1000).toFixed(1)}s)</span>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-0.5 truncate">{summary}</p>
+          <p className="text-xs text-text-muted mt-0.5 truncate">{summary}</p>
         </div>
-        {expanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+        {expanded ? <ChevronUp className="w-4 h-4 text-text-muted" /> : <ChevronDown className="w-4 h-4 text-text-muted" />}
       </button>
       {expanded && (
-        <div className="px-5 pb-5 pt-0 border-t border-gray-800/50">{children}</div>
+        <div className="px-5 pb-5 pt-0 border-t border-border/50">{children}</div>
       )}
     </div>
   );
@@ -417,22 +417,22 @@ function ProductIntelView({ data }: { data: ProductIntel }) {
   return (
     <div className="space-y-5">
       {/* Hero row */}
-      <div className="flex items-start gap-4 border border-gray-800 rounded-xl p-4 bg-gray-900/40">
+      <div className="flex items-start gap-4 border border-border rounded-xl p-4 bg-surface-50/40">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <h4 className="text-lg font-semibold text-white">{data.productName}</h4>
+            <h4 className="text-lg font-semibold text-text-primary">{data.productName}</h4>
             {data.trendingStatus && (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
                 <TrendingUp className="w-3 h-3" /> Trending
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-400">{data.brand} · {data.category}</p>
-          <p className="text-sm text-gray-300 mt-2">{data.primaryBenefit}</p>
+          <p className="text-sm text-text-muted">{data.brand} · {data.category}</p>
+          <p className="text-sm text-text-secondary mt-2">{data.primaryBenefit}</p>
         </div>
         <div className="text-right flex-shrink-0">
           <p className="text-2xl font-bold text-emerald-400">${data.price}</p>
-          <p className="text-xs text-gray-500">{data.size}</p>
+          <p className="text-xs text-text-muted">{data.size}</p>
         </div>
       </div>
 
@@ -444,7 +444,7 @@ function ProductIntelView({ data }: { data: ProductIntel }) {
             <SectionLabel>Key Features</SectionLabel>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {data.keyFeatures.map((f, i) => (
-                <span key={i} className="px-2.5 py-1 rounded-full text-xs bg-gray-800 text-gray-300 border border-gray-700">{f}</span>
+                <span key={i} className="px-2.5 py-1 rounded-full text-xs bg-surface-200 text-text-secondary border border-border-light">{f}</span>
               ))}
             </div>
           </div>
@@ -452,7 +452,7 @@ function ProductIntelView({ data }: { data: ProductIntel }) {
             <SectionLabel>Pain Points Solved</SectionLabel>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {data.painPointsSolved.map((p, i) => (
-                <span key={i} className="px-2.5 py-1 rounded-full text-xs bg-rose-500/10 text-rose-300 border border-rose-500/20">{p}</span>
+                <span key={i} className="px-2.5 py-1 rounded-full text-xs bg-brand-500/10 text-brand-300 border border-brand-500/20">{p}</span>
               ))}
             </div>
           </div>
@@ -460,9 +460,9 @@ function ProductIntelView({ data }: { data: ProductIntel }) {
             <SectionLabel>Competitors</SectionLabel>
             <div className="space-y-1 mt-1.5">
               {data.competitorProducts.map((c, i) => (
-                <div key={i} className="flex items-center justify-between text-xs px-3 py-1.5 rounded-lg bg-gray-800/50">
-                  <span className="text-gray-300">{c.name}</span>
-                  <span className="text-gray-500">${c.price}</span>
+                <div key={i} className="flex items-center justify-between text-xs px-3 py-1.5 rounded-lg bg-surface-200/50">
+                  <span className="text-text-secondary">{c.name}</span>
+                  <span className="text-text-muted">${c.price}</span>
                 </div>
               ))}
             </div>
@@ -490,9 +490,9 @@ function ProductIntelView({ data }: { data: ProductIntel }) {
               ))}
             </ul>
           </div>
-          <div className="border border-gray-800 rounded-lg p-3 bg-gray-950/40">
+          <div className="border border-border rounded-lg p-3 bg-surface-0/40">
             <SectionLabel>Target Audience</SectionLabel>
-            <p className="text-sm text-gray-300 mt-1">{data.targetAudience}</p>
+            <p className="text-sm text-text-secondary mt-1">{data.targetAudience}</p>
           </div>
         </div>
       </div>
@@ -508,18 +508,18 @@ function StrategyView({ data }: { data: ContentStrategy }) {
   return (
     <div className="space-y-5">
       {/* Primary decision */}
-      <div className="border border-violet-500/30 rounded-xl p-4 bg-violet-500/5">
+      <div className="border border-accent-500/30 rounded-xl p-4 bg-accent-500/5">
         <div className="flex items-center justify-between">
           <div>
             <SectionLabel>Hook Format</SectionLabel>
-            <p className="text-lg font-semibold text-violet-300 mt-1 capitalize">{data.hookFormat.replace(/_/g, ' ')}</p>
+            <p className="text-lg font-semibold text-accent-300 mt-1 capitalize">{data.hookFormat.replace(/_/g, ' ')}</p>
           </div>
           <div className="text-right">
             <SectionLabel>Content Format</SectionLabel>
-            <p className="text-lg font-semibold text-white mt-1 capitalize">{data.contentFormat.replace(/_/g, ' ')}</p>
+            <p className="text-lg font-semibold text-text-primary mt-1 capitalize">{data.contentFormat.replace(/_/g, ' ')}</p>
           </div>
         </div>
-        <p className="text-xs text-gray-400 mt-2">{data.hookRationale}</p>
+        <p className="text-xs text-text-muted mt-2">{data.hookRationale}</p>
       </div>
 
       {/* Details grid */}
@@ -529,9 +529,9 @@ function StrategyView({ data }: { data: ContentStrategy }) {
         <InfoBlock label="Posting Time" value={data.optimalPostingTime} />
       </div>
 
-      <div className="border border-gray-800 rounded-lg p-3 bg-gray-950/40">
+      <div className="border border-border rounded-lg p-3 bg-surface-0/40">
         <SectionLabel>Character Outfit</SectionLabel>
-        <p className="text-sm text-gray-300 mt-1">{data.characterOutfit}</p>
+        <p className="text-sm text-text-secondary mt-1">{data.characterOutfit}</p>
       </div>
 
       <div>
@@ -541,8 +541,8 @@ function StrategyView({ data }: { data: ContentStrategy }) {
         </div>
         <div className="flex flex-wrap gap-1.5 mt-1.5">
           {Object.entries(data.hashtagStrategy).map(([type, tag]) => (
-            <span key={type} className="px-2.5 py-1 rounded-full text-xs bg-violet-500/10 text-violet-300 border border-violet-500/20">
-              {tag} <span className="text-violet-500/60 text-[10px]">({type})</span>
+            <span key={type} className="px-2.5 py-1 rounded-full text-xs bg-accent-500/10 text-accent-300 border border-accent-500/20">
+              {tag} <span className="text-accent-500/60 text-[10px]">({type})</span>
             </span>
           ))}
         </div>
@@ -562,7 +562,7 @@ function ScriptView({ data, selectedHook, onSelectHook }: {
 }) {
   const [showAllHooks, setShowAllHooks] = useState(false);
   const sections = [
-    { key: 'hook', label: 'Hook', color: 'text-rose-400', bg: 'border-rose-500/20', ...data.fullScript.hookSection },
+    { key: 'hook', label: 'Hook', color: 'text-brand-400', bg: 'border-brand-500/20', ...data.fullScript.hookSection },
     { key: 'product', label: 'Product', color: 'text-blue-400', bg: 'border-blue-500/20', ...data.fullScript.productSection },
     { key: 'trust', label: 'Trust', color: 'text-amber-400', bg: 'border-amber-500/20', ...data.fullScript.trustSection },
     { key: 'cta', label: 'CTA', color: 'text-emerald-400', bg: 'border-emerald-500/20', ...data.fullScript.ctaSection },
@@ -576,18 +576,18 @@ function ScriptView({ data, selectedHook, onSelectHook }: {
       <div>
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>Video Script ({data.estimatedDuration})</SectionLabel>
-          <span className="text-xs text-gray-500">{data.totalWordCount} words</span>
+          <span className="text-xs text-text-muted">{data.totalWordCount} words</span>
         </div>
         <div className="space-y-1">
           {sections.map(sec => (
-            <div key={sec.key} className={cn('border rounded-lg p-3 bg-gray-950/40', sec.bg)}>
+            <div key={sec.key} className={cn('border rounded-lg p-3 bg-surface-0/40', sec.bg)}>
               <div className="flex items-center gap-3 mb-1">
                 <span className={cn('text-[10px] font-bold uppercase tracking-wider', sec.color)}>{sec.label}</span>
-                <span className="text-[10px] text-gray-600 font-mono">{sec.timing}</span>
-                <span className="text-[10px] text-gray-700 ml-auto">{sec.wordCount}w</span>
+                <span className="text-[10px] text-text-dim font-mono">{sec.timing}</span>
+                <span className="text-[10px] text-text-dim ml-auto">{sec.wordCount}w</span>
               </div>
-              <p className="text-sm text-gray-200 leading-relaxed">{sec.voiceover}</p>
-              <p className="text-[11px] text-gray-600 mt-1.5">Overlay: {sec.textOverlay}</p>
+              <p className="text-sm text-text-primary leading-relaxed">{sec.voiceover}</p>
+              <p className="text-[11px] text-text-dim mt-1.5">Overlay: {sec.textOverlay}</p>
             </div>
           ))}
         </div>
@@ -597,7 +597,7 @@ function ScriptView({ data, selectedHook, onSelectHook }: {
       <div>
         <div className="flex items-center justify-between mb-2">
           <SectionLabel>Hook Variations</SectionLabel>
-          <button onClick={() => setShowAllHooks(!showAllHooks)} className="text-[11px] text-violet-400 hover:text-violet-300">
+          <button onClick={() => setShowAllHooks(!showAllHooks)} className="text-[11px] text-accent-400 hover:text-accent-300">
             {showAllHooks ? 'Show top hooks' : `Show all ${data.hookVariants.length}`}
           </button>
         </div>
@@ -605,12 +605,12 @@ function ScriptView({ data, selectedHook, onSelectHook }: {
       </div>
 
       {/* ElevenLabs script — collapsed */}
-      <div className="border border-gray-800 rounded-lg p-3 bg-gray-950/40">
+      <div className="border border-border rounded-lg p-3 bg-surface-0/40">
         <div className="flex items-center justify-between mb-2">
           <SectionLabel>ElevenLabs Script</SectionLabel>
           <CopyButton text={data.elevenlabsFullScript} label="Copy Script" />
         </div>
-        <p className="text-xs text-gray-400 leading-relaxed line-clamp-3">{data.elevenlabsFullScript}</p>
+        <p className="text-xs text-text-muted leading-relaxed line-clamp-3">{data.elevenlabsFullScript}</p>
       </div>
     </div>
   );
@@ -626,13 +626,13 @@ function VisualsView({ data, persona }: { data: VisualPackage; persona?: Persona
   return (
     <div className="space-y-5">
       {/* Persona references + character prompt */}
-      <div className="border border-gray-800 rounded-xl p-4 bg-gray-900/40">
+      <div className="border border-border rounded-xl p-4 bg-surface-50/40">
         <div className="flex items-start gap-4">
           {/* Reference images */}
           {persona?.referenceImageUrls && persona.referenceImageUrls.length > 0 && (
             <div className="flex gap-1.5 flex-shrink-0">
               {persona.referenceImageUrls.slice(0, 3).map((url, i) => (
-                <img key={i} src={url} alt="" className="w-14 h-14 rounded-lg object-cover border border-gray-700" />
+                <img key={i} src={url} alt="" className="w-14 h-14 rounded-lg object-cover border border-border-light" />
               ))}
             </div>
           )}
@@ -641,7 +641,7 @@ function VisualsView({ data, persona }: { data: VisualPackage; persona?: Persona
               <SectionLabel>Character Lock</SectionLabel>
               <CopyButton text={data.baseCharacterPrompt} />
             </div>
-            <p className="text-xs text-gray-400 leading-relaxed line-clamp-2">{data.baseCharacterPrompt}</p>
+            <p className="text-xs text-text-muted leading-relaxed line-clamp-2">{data.baseCharacterPrompt}</p>
           </div>
         </div>
       </div>
@@ -653,22 +653,22 @@ function VisualsView({ data, persona }: { data: VisualPackage; persona?: Persona
           {data.shotPrompts.map((shot, i) => {
             const isExpanded = expandedShot === shot.shotId;
             return (
-              <div key={shot.shotId} className="border border-gray-800 rounded-lg bg-gray-950/40 overflow-hidden">
+              <div key={shot.shotId} className="border border-border rounded-lg bg-surface-0/40 overflow-hidden">
                 {/* Shot header — always visible */}
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <span className="w-7 h-7 rounded-full bg-violet-500/15 text-violet-400 flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
+                  <span className="w-7 h-7 rounded-full bg-accent-500/15 text-accent-400 flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white capitalize">{shot.purpose.replace(/_/g, ' ')}</span>
-                      <span className="text-[10px] text-gray-600 font-mono">{shot.timing}</span>
+                      <span className="text-sm font-medium text-text-primary capitalize">{shot.purpose.replace(/_/g, ' ')}</span>
+                      <span className="text-[10px] text-text-dim font-mono">{shot.timing}</span>
                     </div>
-                    <p className="text-[11px] text-gray-500 mt-0.5">{shot.compositionNotes}</p>
+                    <p className="text-[11px] text-text-muted mt-0.5">{shot.compositionNotes}</p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <CopyButton text={shot.fullPrompt} label="Copy" />
                     <button
                       onClick={() => setExpandedShot(isExpanded ? null : shot.shotId)}
-                      className="px-2 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                      className="px-2 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-primary hover:bg-surface-200 transition-colors"
                     >
                       {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </button>
@@ -676,9 +676,9 @@ function VisualsView({ data, persona }: { data: VisualPackage; persona?: Persona
                 </div>
                 {/* Expanded: full prompt */}
                 {isExpanded && (
-                  <div className="px-4 pb-3 border-t border-gray-800/50">
-                    <p className="text-xs text-gray-400 leading-relaxed mt-2">{shot.fullPrompt}</p>
-                    <div className="flex items-center gap-4 mt-2 text-[11px] text-gray-600">
+                  <div className="px-4 pb-3 border-t border-border/50">
+                    <p className="text-xs text-text-muted leading-relaxed mt-2">{shot.fullPrompt}</p>
+                    <div className="flex items-center gap-4 mt-2 text-[11px] text-text-dim">
                       <span>Lighting: {shot.lighting}</span>
                       <span>Props: {shot.props.join(', ')}</span>
                     </div>
@@ -691,11 +691,11 @@ function VisualsView({ data, persona }: { data: VisualPackage; persona?: Persona
       </div>
 
       {/* Consistency */}
-      <div className="border border-gray-800 rounded-lg p-3 bg-gray-950/40">
+      <div className="border border-border rounded-lg p-3 bg-surface-0/40">
         <SectionLabel>Consistency Checklist</SectionLabel>
         <div className="grid grid-cols-2 gap-1 mt-1.5">
           {data.consistencyChecklist.map((item, i) => (
-            <span key={i} className="text-[11px] text-gray-400 flex items-center gap-1">
+            <span key={i} className="text-[11px] text-text-muted flex items-center gap-1">
               <Check className="w-3 h-3 text-emerald-500 flex-shrink-0" /> {item}
             </span>
           ))}
@@ -713,11 +713,11 @@ function AudioView({ data }: { data: AudioPackage }) {
   return (
     <div className="space-y-5">
       {/* Voice settings + recommended voice */}
-      <div className="border border-gray-800 rounded-xl p-4 bg-gray-900/40">
+      <div className="border border-border rounded-xl p-4 bg-surface-50/40">
         <div className="flex items-center justify-between mb-3">
           <SectionLabel>ElevenLabs Voice</SectionLabel>
           {data.elevenlabsPayload.recommendedStockVoice && (
-            <span className="text-xs text-violet-400 font-medium">{data.elevenlabsPayload.recommendedStockVoice.name}</span>
+            <span className="text-xs text-accent-400 font-medium">{data.elevenlabsPayload.recommendedStockVoice.name}</span>
           )}
         </div>
         <div className="grid grid-cols-4 gap-3">
@@ -733,14 +733,14 @@ function AudioView({ data }: { data: AudioPackage }) {
         <SectionLabel>Background Sound</SectionLabel>
         <div className="mt-2 space-y-2">
           {data.trendingSoundOptions.map((sound, i) => (
-            <div key={i} className={cn('flex items-start gap-3 border rounded-lg p-3', sound.recommended ? 'border-violet-500/30 bg-violet-500/5' : 'border-gray-800 bg-gray-950/40')}>
-              <Volume2 className={cn('w-4 h-4 mt-0.5 flex-shrink-0', sound.recommended ? 'text-violet-400' : 'text-gray-600')} />
+            <div key={i} className={cn('flex items-start gap-3 border rounded-lg p-3', sound.recommended ? 'border-accent-500/30 bg-accent-500/5' : 'border-border bg-surface-0/40')}>
+              <Volume2 className={cn('w-4 h-4 mt-0.5 flex-shrink-0', sound.recommended ? 'text-accent-400' : 'text-text-dim')} />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-white">{sound.soundName}</span>
-                  {sound.recommended && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-500/15 text-violet-400">Recommended</span>}
+                  <span className="text-sm font-medium text-text-primary">{sound.soundName}</span>
+                  {sound.recommended && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent-500/15 text-accent-400">Recommended</span>}
                 </div>
-                <p className="text-[11px] text-gray-500 mt-0.5">{sound.notes}</p>
+                <p className="text-[11px] text-text-muted mt-0.5">{sound.notes}</p>
               </div>
             </div>
           ))}
@@ -768,11 +768,11 @@ function MetadataView({ data }: { data: MetadataPackage }) {
   return (
     <div className="space-y-4">
       {/* Platform toggle */}
-      <div className="flex bg-gray-800 rounded-lg overflow-hidden w-fit">
-        <button onClick={() => setPlatform('tiktok')} className={cn('px-4 py-2 text-sm font-medium transition-colors', platform === 'tiktok' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white')}>
+      <div className="flex bg-surface-200 rounded-lg overflow-hidden w-fit">
+        <button onClick={() => setPlatform('tiktok')} className={cn('px-4 py-2 text-sm font-medium transition-colors', platform === 'tiktok' ? 'bg-accent-600 text-white' : 'text-text-muted hover:text-text-primary')}>
           TikTok
         </button>
-        <button onClick={() => setPlatform('instagram')} className={cn('px-4 py-2 text-sm font-medium transition-colors', platform === 'instagram' ? 'bg-white text-gray-900' : 'text-gray-400 hover:text-white')}>
+        <button onClick={() => setPlatform('instagram')} className={cn('px-4 py-2 text-sm font-medium transition-colors', platform === 'instagram' ? 'bg-accent-600 text-white' : 'text-text-muted hover:text-text-primary')}>
           Instagram
         </button>
       </div>
@@ -780,21 +780,21 @@ function MetadataView({ data }: { data: MetadataPackage }) {
       {platform === 'tiktok' ? (
         <div className="space-y-4">
           {/* Title */}
-          <div className="border border-gray-800 rounded-lg p-4 bg-gray-950/40">
+          <div className="border border-border rounded-lg p-4 bg-surface-0/40">
             <div className="flex items-center justify-between mb-1">
               <SectionLabel>Title</SectionLabel>
               <CopyButton text={data.tiktok.title} />
             </div>
-            <p className="text-sm text-gray-200">{data.tiktok.title}</p>
+            <p className="text-sm text-text-primary">{data.tiktok.title}</p>
           </div>
 
           {/* Caption */}
-          <div className="border border-gray-800 rounded-lg p-4 bg-gray-950/40">
+          <div className="border border-border rounded-lg p-4 bg-surface-0/40">
             <div className="flex items-center justify-between mb-1">
               <SectionLabel>Caption</SectionLabel>
               <CopyButton text={data.tiktok.caption} />
             </div>
-            <p className="text-sm text-gray-200 whitespace-pre-line leading-relaxed">{data.tiktok.caption}</p>
+            <p className="text-sm text-text-primary whitespace-pre-line leading-relaxed">{data.tiktok.caption}</p>
           </div>
 
           {/* Hashtags */}
@@ -805,36 +805,36 @@ function MetadataView({ data }: { data: MetadataPackage }) {
             </div>
             <div className="flex flex-wrap gap-1.5">
               {data.tiktok.hashtags.map((h, i) => (
-                <span key={i} className="px-2.5 py-1 rounded-full text-xs bg-violet-500/10 text-violet-300 border border-violet-500/20">{h.tag}</span>
+                <span key={i} className="px-2.5 py-1 rounded-full text-xs bg-accent-500/10 text-accent-300 border border-accent-500/20">{h.tag}</span>
               ))}
             </div>
           </div>
 
           {/* Posting + Engagement side by side */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="border border-gray-800 rounded-lg p-3 bg-gray-950/40">
+            <div className="border border-border rounded-lg p-3 bg-surface-0/40">
               <SectionLabel>Posting Schedule</SectionLabel>
-              <p className="text-sm text-white mt-1 font-medium">{data.tiktok.postingSchedule.optimalTime}</p>
-              <p className="text-xs text-gray-400">{data.tiktok.postingSchedule.dayOfWeek}</p>
-              <p className="text-[11px] text-gray-600 mt-1">{data.tiktok.postingSchedule.rationale}</p>
+              <p className="text-sm text-text-primary mt-1 font-medium">{data.tiktok.postingSchedule.optimalTime}</p>
+              <p className="text-xs text-text-muted">{data.tiktok.postingSchedule.dayOfWeek}</p>
+              <p className="text-[11px] text-text-dim mt-1">{data.tiktok.postingSchedule.rationale}</p>
             </div>
-            <div className="border border-gray-800 rounded-lg p-3 bg-gray-950/40">
+            <div className="border border-border rounded-lg p-3 bg-surface-0/40">
               <div className="flex items-center justify-between">
                 <SectionLabel>Pinned Comment</SectionLabel>
                 <CopyButton text={data.tiktok.engagementStrategy.pinComment} />
               </div>
-              <p className="text-sm text-gray-300 mt-1 italic leading-relaxed">"{data.tiktok.engagementStrategy.pinComment}"</p>
+              <p className="text-sm text-text-secondary mt-1 italic leading-relaxed">"{data.tiktok.engagementStrategy.pinComment}"</p>
             </div>
           </div>
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="border border-gray-800 rounded-lg p-4 bg-gray-950/40">
+          <div className="border border-border rounded-lg p-4 bg-surface-0/40">
             <div className="flex items-center justify-between mb-1">
               <SectionLabel>Caption</SectionLabel>
               <CopyButton text={data.instagram.caption} />
             </div>
-            <p className="text-sm text-gray-200 whitespace-pre-line leading-relaxed">{data.instagram.caption}</p>
+            <p className="text-sm text-text-primary whitespace-pre-line leading-relaxed">{data.instagram.caption}</p>
           </div>
           {data.instagram.brandMentions.length > 0 && (
             <div>
@@ -857,7 +857,7 @@ function MetadataView({ data }: { data: MetadataPackage }) {
 // =============================================================================
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">{children}</p>;
+  return <p className="text-[11px] uppercase tracking-wider text-text-muted font-medium">{children}</p>;
 }
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -875,7 +875,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
         'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
         copied
           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-          : 'bg-gray-800/60 text-gray-400 border-gray-700 hover:text-white hover:border-gray-500'
+          : 'bg-surface-200/60 text-text-muted border-border-light hover:text-text-primary hover:border-border-light'
       )}
     >
       {copied ? <ClipboardCheck className="w-3 h-3" /> : <Clipboard className="w-3 h-3" />}
@@ -886,37 +886,37 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
 
 function InfoBlock({ label, value, note, highlight }: { label: string; value: string; note?: string; highlight?: boolean }) {
   return (
-    <div className={cn('border rounded-lg p-3', highlight ? 'border-violet-500/30 bg-violet-500/5' : 'border-gray-800 bg-gray-950/40')}>
-      <p className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">{label}</p>
-      <p className={cn('text-sm font-medium mt-1', highlight ? 'text-violet-300' : 'text-white')}>{value}</p>
-      {note && <p className="text-[11px] text-gray-500 mt-1">{note}</p>}
+    <div className={cn('border rounded-lg p-3', highlight ? 'border-accent-500/30 bg-accent-500/5' : 'border-border bg-surface-0/40')}>
+      <p className="text-[11px] uppercase tracking-wider text-text-muted font-medium">{label}</p>
+      <p className={cn('text-sm font-medium mt-1', highlight ? 'text-accent-300' : 'text-text-primary')}>{value}</p>
+      {note && <p className="text-[11px] text-text-muted mt-1">{note}</p>}
     </div>
   );
 }
 
 function PipelineStepInfo({ icon, label, desc, model }: { icon: React.ReactNode; label: string; desc: string; model: 'sonnet' | 'haiku' }) {
   return (
-    <div className="border border-gray-800 rounded-lg p-3 bg-gray-950/40 space-y-1.5">
+    <div className="border border-border rounded-lg p-3 bg-surface-0/40 space-y-1.5">
       <div className="flex items-center gap-2">
-        <span className="text-violet-400">{icon}</span>
-        <span className="text-xs font-medium text-white">{label}</span>
+        <span className="text-accent-400">{icon}</span>
+        <span className="text-xs font-medium text-text-primary">{label}</span>
         <span className={cn(
           'ml-auto px-1.5 py-0.5 rounded text-[9px] font-medium',
-          model === 'sonnet' ? 'bg-violet-500/10 text-violet-400' : 'bg-gray-800 text-gray-500'
+          model === 'sonnet' ? 'bg-accent-500/10 text-accent-400' : 'bg-surface-200 text-text-muted'
         )}>
           {model}
         </span>
       </div>
-      <p className="text-[11px] text-gray-500 leading-relaxed">{desc}</p>
+      <p className="text-[11px] text-text-muted leading-relaxed">{desc}</p>
     </div>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border border-gray-800 rounded-lg p-2.5 bg-gray-950/40">
-      <p className="text-[10px] text-gray-500">{label}</p>
-      <p className="text-sm font-medium text-white mt-0.5">{value}</p>
+    <div className="border border-border rounded-lg p-2.5 bg-surface-0/40">
+      <p className="text-[10px] text-text-muted">{label}</p>
+      <p className="text-sm font-medium text-text-primary mt-0.5">{value}</p>
     </div>
   );
 }

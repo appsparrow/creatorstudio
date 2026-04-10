@@ -9,10 +9,10 @@ interface PipelineProgressProps {
 }
 
 const STATUS_CONFIG: Record<UGCStepStatus, { icon: React.ReactNode; color: string; bg: string }> = {
-  pending:  { icon: <span className="w-2 h-2 rounded-full bg-gray-600" />, color: 'text-gray-500', bg: 'bg-gray-800/40' },
+  pending:  { icon: <span className="w-2 h-2 rounded-full bg-text-dim" />, color: 'text-text-muted', bg: 'bg-surface-200/40' },
   running:  { icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />, color: 'text-amber-400', bg: 'bg-amber-500/10' },
   complete: { icon: <Check className="w-3.5 h-3.5" />, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  paused:   { icon: <Pause className="w-3.5 h-3.5" />, color: 'text-violet-400', bg: 'bg-violet-500/10' },
+  paused:   { icon: <Pause className="w-3.5 h-3.5" />, color: 'text-accent-400', bg: 'bg-accent-500/10' },
   error:    { icon: <AlertCircle className="w-3.5 h-3.5" />, color: 'text-red-400', bg: 'bg-red-500/10' },
   edited:   { icon: <Pencil className="w-3.5 h-3.5" />, color: 'text-blue-400', bg: 'bg-blue-500/10' },
 };
@@ -34,7 +34,7 @@ export default function PipelineProgress({ steps }: PipelineProgressProps) {
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
                 cfg.bg, cfg.color,
-                step.status === 'pending' ? 'border-gray-800' : 'border-transparent'
+                step.status === 'pending' ? 'border-border' : 'border-transparent'
               )}
             >
               {cfg.icon}
@@ -49,13 +49,13 @@ export default function PipelineProgress({ steps }: PipelineProgressProps) {
 
       {/* Progress bar */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className="flex-1 h-1.5 bg-surface-200 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-violet-500 to-rose-500 rounded-full transition-all duration-500"
+            className="h-full bg-gradient-to-r from-accent-500 to-brand-500 rounded-full transition-all duration-500"
             style={{ width: `${pct}%` }}
           />
         </div>
-        <span className="text-xs text-gray-500 tabular-nums w-8 text-right">{pct}%</span>
+        <span className="text-xs text-text-muted tabular-nums w-8 text-right">{pct}%</span>
       </div>
     </div>
   );
