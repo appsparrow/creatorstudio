@@ -263,13 +263,37 @@ export default function UGCPostCard({ day, persona, onUpdateField, onDelete }: U
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        {/* Before generation — waiting state */}
+        {/* Before generation or failed state */}
         {!run && !isGenerating && (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <Loader2 className="w-10 h-10 text-text-dim mx-auto mb-3" />
-              <p className="text-text-muted text-sm">Pipeline not started yet</p>
-              <p className="text-text-dim text-xs mt-1">Use "Regenerate" above to run the pipeline for this product</p>
+            <div className="text-center max-w-sm">
+              {day.theme?.startsWith('Error:') ? (
+                <>
+                  <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+                  <p className="text-red-400 text-sm font-medium">Generation Failed</p>
+                  <p className="text-text-muted text-xs mt-2 mb-4">{day.theme.replace('Error: ', '')}</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      onClick={handleRegenerate}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-500 text-white text-xs font-medium transition-colors"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" /> Try Again
+                    </button>
+                    <button
+                      onClick={onDelete}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium border border-red-500/20 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-10 h-10 text-text-dim mx-auto mb-3" />
+                  <p className="text-text-muted text-sm">No content generated yet</p>
+                  <p className="text-text-dim text-xs mt-1">Use "Regenerate" above to run the pipeline</p>
+                </>
+              )}
             </div>
           </div>
         )}

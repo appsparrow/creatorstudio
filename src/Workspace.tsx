@@ -1843,8 +1843,19 @@ ${selectedPersona.aiAnalysis ? `\nIDENTITY RULES: ${selectedPersona.aiAnalysis}`
                     </div>
                   </div>
 
+                  {/* Delete button for error posts */}
+                  {day.theme?.startsWith('Error:') && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteDay(day.id); }}
+                      className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
+                      title="Delete failed post"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
                   {/* Image thumbnail */}
-                  {(day.generatedImageUrl || day.customMediaUrl || day.thumbnailUrl) && (
+                  {!day.theme?.startsWith('Error:') && (day.generatedImageUrl || day.customMediaUrl || day.thumbnailUrl) && (
                     <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
                       <img src={driveDisplayUrl(day.thumbnailUrl || day.customMediaUrl || day.generatedImageUrl)} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </div>

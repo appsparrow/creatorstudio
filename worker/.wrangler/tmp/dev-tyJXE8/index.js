@@ -23177,10 +23177,13 @@ function dayToDb(day, userId) {
     custom_media_url: day.customMediaUrl ?? null,
     pending_video_task_id: day.pendingVideoTaskId ?? null,
     status: day.status ?? "draft",
-    is_ai_generated: day.isAIGenerated ?? null,
-    is_good_to_post: day.isGoodToPost ?? null,
+    is_ai_generated: day.isAIGenerated ?? false,
+    is_good_to_post: day.isGoodToPost ?? false,
     post_image_references: day.postImageReferences ?? null,
-    slides: day.slides ?? null
+    slides: day.slides ?? null,
+    source: day.source ?? "studio",
+    ugc_run_id: day.ugcRunId ?? null,
+    product_url: day.productUrl ?? null
   };
 }
 __name(dayToDb, "dayToDb");
@@ -23212,7 +23215,10 @@ function dbToDay(row) {
     isAIGenerated: row.is_ai_generated ?? void 0,
     isGoodToPost: row.is_good_to_post ?? void 0,
     postImageReferences: row.post_image_references ?? void 0,
-    slides: row.slides ?? void 0
+    slides: row.slides ?? void 0,
+    source: row.source ?? "studio",
+    ugcRunId: row.ugc_run_id ?? void 0,
+    productUrl: row.product_url ?? void 0
   };
 }
 __name(dbToDay, "dbToDay");
@@ -23379,7 +23385,9 @@ appWithVars.get("/api/settings", async (c) => {
     postsPerDay: row.posts_per_day ?? 1,
     publicTunnelUrl: row.public_tunnel_url ?? "",
     metaAccessToken: row.meta_access_token ?? "",
-    metaAppId: row.meta_app_id ?? ""
+    metaAppId: row.meta_app_id ?? "",
+    anthropicApiKey: row.anthropic_api_key ?? "",
+    primaryLlm: row.primary_llm ?? "claude"
   });
 });
 appWithVars.post("/api/settings", async (c) => {
@@ -23403,7 +23411,9 @@ appWithVars.post("/api/settings", async (c) => {
     postsPerDay: "posts_per_day",
     publicTunnelUrl: "public_tunnel_url",
     metaAccessToken: "meta_access_token",
-    metaAppId: "meta_app_id"
+    metaAppId: "meta_app_id",
+    anthropicApiKey: "anthropic_api_key",
+    primaryLlm: "primary_llm"
   };
   const row = { user_id: userId };
   for (const [camel, snake] of Object.entries(keyMap)) {
@@ -24029,6 +24039,189 @@ appWithVars.get("/api/media/*", async (c) => {
   headers.set("Content-Type", obj.httpMetadata?.contentType || "application/octet-stream");
   headers.set("Cache-Control", "public, max-age=31536000");
   return new Response(obj.body, { headers });
+});
+appWithVars.post("/api/claude/messages", async (c) => {
+  const supabase = c.get("supabase");
+  const userId = c.get("userId");
+  const { data: settingsRow } = await supabase.from("user_settings").select("anthropic_api_key").eq("user_id", userId).single();
+  const apiKey = settingsRow?.anthropic_api_key || c.env.ANTHROPIC_API_KEY || "";
+  if (!apiKey) return c.json({ error: "Anthropic API key not configured. Add it in Settings." }, 400);
+  const body = await c.req.json();
+  const { model, system, messages, max_tokens, temperature } = body;
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: model || "claude-sonnet-4-20250514",
+      max_tokens: max_tokens || 4096,
+      temperature: temperature ?? 0.7,
+      ...system ? { system } : {},
+      messages
+    })
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    return c.json({ error: errorText }, response.status);
+  }
+  return c.json(await response.json());
+});
+appWithVars.post("/api/ugc/generate", async (c) => {
+  const supabase = c.get("supabase");
+  const userId = c.get("userId");
+  const body = await c.req.json();
+  const { productUrl, productText, persona, mode } = body;
+  const { data: settingsRow } = await supabase.from("user_settings").select("anthropic_api_key").eq("user_id", userId).single();
+  const apiKey = settingsRow?.anthropic_api_key || c.env.ANTHROPIC_API_KEY || "";
+  if (!apiKey) return c.json({ error: "Anthropic API key not configured." }, 400);
+  const SONNET = "claude-sonnet-4-20250514";
+  const HAIKU = "claude-haiku-4-5-20251001";
+  const callClaude = /* @__PURE__ */ __name(async (model, system, prompt) => {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 4096,
+        temperature: 0.7,
+        system: system + "\n\nIMPORTANT: Respond with valid JSON only. No markdown code fences, no explanation, just the JSON object.",
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Claude error ${res.status}: ${err}`);
+    }
+    const data = await res.json();
+    const text = data.content[0]?.text || "{}";
+    const cleaned = text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    return JSON.parse(cleaned);
+  }, "callClaude");
+  const characterPrompt = persona ? `Photorealistic ${persona.identity?.nationality || ""} ${persona.identity?.gender || ""}, ${persona.identity?.age || 27} years old, ${persona.appearance?.hair || ""}, ${persona.appearance?.eyes || ""}, ${persona.appearance?.bodyType || ""} build, ${persona.appearance?.faceShape || ""} face, ${(persona.appearance?.distinctFeatures || []).join(", ")}, ${persona.fashionStyle?.aesthetic || ""} style, UGC content creator aesthetic, iPhone 14 Pro quality realism, high resolution, authentic lifestyle photography` : "";
+  const personaVoice = persona ? `Voice: ${persona.identity?.fullName || "creator"}. Traits: ${(persona.psychographic?.coreTraits || []).join(", ")}. Style: ${persona.fashionStyle?.aesthetic || "modern"}. Mission: ${persona.psychographic?.mission || ""}` : "";
+  const input = productText || productUrl || "";
+  const svc = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: libItems } = await svc.from("production_library").select("*").eq("is_active", true).order("sort_order");
+  const libraryHooks = (libItems || []).filter((i) => i.item_type === "viral_hook");
+  const libraryFormats = (libItems || []).filter((i) => i.item_type === "content_format");
+  const libraryRules = (libItems || []).filter((i) => i.item_type === "decision_rule");
+  const librarySettings = (libItems || []).filter((i) => i.item_type === "location_setting");
+  const hooksContext = libraryHooks.map((h) => `${h.label} (score: ${h.performance_score}): "${h.data.structure}" \u2014 Best for: ${(h.data.bestFor || []).join(", ")}. Trigger: ${h.data.triggerCondition || ""}`).join("\n") || "price_reveal, pov, discovery, social_proof, comparison, opinion";
+  const rulesContext = libraryRules.map((r) => `${r.data.category}: hook=${(r.data.recommendedHook || "").replace("hook_", "")} format=${(r.data.recommendedFormat || "").replace("format_", "")} \u2014 ${r.data.reasoning || ""}`).join("\n") || "";
+  try {
+    const productIntel = await callClaude(
+      HAIKU,
+      "You are a product research analyst.",
+      `Extract product data from: ${input}
+
+Return JSON with: productName, brand, category, subcategory, price, currency, size, keyFeatures[], primaryBenefit, painPointsSolved[], reviewSentiment:{positive[],negative[]}, competitorProducts:[{name,price}], targetAudience, trendingStatus, sourceUrl`
+    );
+    const matchingRule = libraryRules.find((r) => r.data.category === productIntel.category);
+    const validSettings = matchingRule?.data?.validSettings || [];
+    const randomSetting = validSettings.length > 0 ? validSettings[Math.floor(Math.random() * validSettings.length)] : matchingRule?.data?.recommendedSetting || "setting_bathroom";
+    const strategy = await callClaude(
+      SONNET,
+      "You are a TikTok/Instagram content strategist with a Production Library of proven formats.",
+      `Product: ${JSON.stringify(productIntel)}
+Persona: ${persona?.identity?.fullName || "Creator"}
+
+HOOK LIBRARY:
+${hooksContext}
+
+DECISION RULES:
+${rulesContext}
+
+${matchingRule ? `Recommended: hook=${(matchingRule.data.recommendedHook || "").replace("hook_", "")} setting=${randomSetting.replace("setting_", "")}` : "No matching rule."}
+
+Return JSON with: hookFormat, hookRationale, contentFormat, contentRationale, videoLength, setting, characterOutfit, optimalPostingTime, postingRationale, hashtagStrategy:{primary,conversion,product,brand,modifier}, decisionLog:{ruleUsed,libraryHookScore,overridden,overrideReason}`
+    );
+    const chosenHook = libraryHooks.find((h) => h.slug === `hook_${strategy.hookFormat}`);
+    const script = await callClaude(
+      SONNET,
+      "You are a UGC script writer for TikTok/Instagram.",
+      `Product: ${productIntel.productName} \u2014 ${productIntel.primaryBenefit}
+Price: $${productIntel.price}
+Hook: ${strategy.hookFormat}
+Setting: ${strategy.setting}
+Voice: ${personaVoice}
+
+${chosenHook ? `Hook structure: "${chosenHook.data.structure}"
+Examples: ${(chosenHook.data.examples || []).join("; ")}` : ""}
+
+Write 10 hook variations, score each (max 10), select top. Write 4-section script (hook 0-2s, product 2-14s, trust 14-18s, CTA 18-20s). 55-70 words total.
+
+Return JSON with: hookVariants[{hook,score,rationale}], selectedHook, fullScript{hookSection,productSection,trustSection,ctaSection} (each with timing,wordCount,textOverlay,voiceover,visualCue), totalWordCount, estimatedDuration, elevenlabsFullScript, elevenlabsSettings`
+    );
+    const settingData = librarySettings.find((s) => s.slug === randomSetting);
+    const settingCtx = settingData ? `Setting: ${settingData.label} \u2014 ${settingData.data.visual}. Outfit: ${settingData.data.outfit}. Props: ${(settingData.data.props || []).join(", ")}. Lighting: ${settingData.data.lighting}` : "";
+    const [visuals, audio, metadata] = await Promise.all([
+      callClaude(
+        SONNET,
+        "You are a visual director for UGC storyboards.",
+        `Character: ${characterPrompt}
+Product: ${productIntel.productName}
+${settingCtx}
+Outfit: ${strategy.characterOutfit}
+Script: Hook="${script.fullScript?.hookSection?.voiceover}" Product="${script.fullScript?.productSection?.voiceover}" Trust="${script.fullScript?.trustSection?.voiceover}" CTA="${script.fullScript?.ctaSection?.voiceover}"
+
+Create 6 shots (Shot 0=Thumbnail, 1-5=Video). Each with: fullPrompt (self-contained, bake character+setting+lighting+props), videoPrompt (for Kling), voiceover (She says "[tag] text").
+
+Return JSON with: baseCharacterPrompt, fullAudioScript, shotPrompts[{shotId,timing,purpose,fullPrompt,videoPrompt,voiceover,compositionNotes,lighting,props[]}], consistencyChecklist[], imageGenerationSettings{platform,resolution,aspectRatio,quality,style}`
+      ),
+      callClaude(
+        HAIKU,
+        "You are an audio producer for UGC content.",
+        `Script: ${script.elevenlabsFullScript || ""}
+Category: ${productIntel.category}
+
+Return JSON with: elevenlabsPayload:{voiceId,text,voiceSettings:{stability,similarityBoost,style,useSpeakerBoost},outputFormat,speed,recommendedStockVoice:{name,voiceId}}, trendingSoundOptions[3]:{soundName,categoryFit,recommended,notes}, audioMixingInstructions:{voiceoverVolume,backgroundSoundVolume,fadeInDuration,fadeOutDuration,voiceoverPriority}`
+      ),
+      callClaude(
+        HAIKU,
+        "You are a social media metadata specialist.",
+        `Product: ${productIntel.productName} ($${productIntel.price})
+Hook: ${script.selectedHook}
+Hashtags: ${JSON.stringify(strategy.hashtagStrategy || {})}
+Persona: ${persona?.identity?.fullName || ""}
+
+Return JSON with: tiktok:{title,titleCharCount,caption,hashtags[{tag,type,rationale}](5),postingSchedule:{optimalTime,dayOfWeek,rationale,backupTimes[]},engagementStrategy:{pinComment,autoReplyTriggers[{keyword,response}](5)}}, instagram:{caption,hashtagsCount,brandMentions[]}`
+      )
+    ]);
+    const result = {
+      id: `run_${Date.now()}`,
+      personaId: body.personaId,
+      productUrl: productUrl || "",
+      mode: mode || "auto",
+      status: "complete",
+      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      completedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      steps: [
+        { name: "product_intel", status: "complete", durationMs: 0 },
+        { name: "strategy", status: "complete", durationMs: 0 },
+        { name: "script", status: "complete", durationMs: 0 },
+        { name: "visuals", status: "complete", durationMs: 0 },
+        { name: "audio", status: "complete", durationMs: 0 },
+        { name: "metadata", status: "complete", durationMs: 0 }
+      ],
+      productIntel,
+      strategy,
+      script,
+      visuals,
+      audio,
+      metadata
+    };
+    return c.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Pipeline failed";
+    return c.json({ error: msg }, 500);
+  }
 });
 appWithVars.get("/health", (c) => c.json({ status: "ok", ts: Date.now() }));
 var src_default = appWithVars;
